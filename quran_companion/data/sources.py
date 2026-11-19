@@ -1,0 +1,23 @@
+"""Interfaces of the data sources. Adapters implement them; tests use fakes."""
+from typing import Protocol
+
+from ..core.models import Ayah, Reciter, SurahInfo, Translation, VerseTiming
+
+
+class TextSource(Protocol):
+    def surahs(self) -> list[SurahInfo]: ...
+    def translations(self) -> list[Translation]: ...
+    def surah_text(self, surah: int, translation: str = "") -> dict[int, Ayah]: ...
+
+
+class ReciterSource(Protocol):
+    def reciters(self) -> list[Reciter]: ...
+    def audio_url(self, reciter: Reciter, surah: int) -> str: ...
+
+
+class TimingSource(Protocol):
+    def verse_timings(self, reciter: Reciter, surah: int) -> list[VerseTiming]: ...
+
+
+class WordTimingSource(Protocol):
+    def word_fractions(self, reciter: Reciter, surah: int) -> dict[int, dict[int, float]]: ...
