@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quran Floating Subtitles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e1116;--panel:#171b22;--line:#2a303a;--fg:#e8e6e1;--mute:#8b929c;--acc:#d9b35f;--sub-bg:rgba(10,12,16,.82)}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 Inter,system-ui,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:24px 16px}
+  h1{font-size:20px;margin:0 0 4px}
+  p.hint{color:var(--mute);margin:0 0 20px;font-size:13px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+  label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+  select,input,button{font:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  button{cursor:pointer}
+  button:hover{border-color:var(--acc)}
+  button.primary{background:var(--acc);color:#1a1408;border-color:var(--acc);font-weight:600}
+  .bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;align-items:center}
+  .status{color:var(--mute);font-size:13px;margin-left:auto}
+  #stage{min-height:260px;border:1px solid var(--line);border-radius:14px;background:var(--panel);display:flex;align-items:center;justify-content:center;padding:16px}
+  /* subtitle box (also used inside the floating window) */
+  .sub{width:100%;text-align:center;background:var(--sub-bg);border-radius:14px;padding:18px 22px;color:#fff}
+  .sub .ar{font-family:"Amiri Quran","Amiri",serif;direction:rtl;line-height:2.1;font-size:var(--ar-size,38px);color:#fff}
+  .sub .tr{margin-top:8px;font-size:var(--tr-size,17px);color:#cfd3d8;line-height:1.45}
+  .sub .meta{margin-top:10px;font-size:12px;color:var(--acc);letter-spacing:.04em}
+  .sub.flash .ar{animation:fade .35s ease}
+  @keyframes fade{from{opacity:.2;transform:translateY(4px)}to{opacity:1;transform:none}}
+  kbd{background:#222832;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Quran Floating Subtitles</h1>
+  <p class="hint">
+    <b>Reciter mode</b>: plays the selected reciter verse by verse, and the subtitles follow along on their own.<br>
+    <b>Follow-video mode</b>: no audio. Play a recitation on YouTube or anywhere else and press <kbd>→</kbd>/<kbd>Space</kbd> to go to the next verse or <kbd>←</kbd> to go back.<br>
+    Press <b>⧉ Float</b> to open the subtitles in an always-on-top window (Chrome/Edge).
+  </p>
+
+  <div class="grid">
+    <label>Surah <select id="surah"></select></label>
+    <label>Reciter <select id="reciter"></select></label>
+    <label>Translation <select id="trans"></select></label>
+    <label>Mode
+      <select id="mode">
+        <option value="play">Reciter mode (play audio)</option>
+        <option value="follow">Follow-video mode (manual sync)</option>
+      </select>
+    </label>
+    <label>Start at ayah <input id="start" type="number" min="1" value="1"></label>
+    <label>Repeat each ayah <input id="repeat" type="number" min="1" max="20" value="1"></label>
+    <label>Arabic size <input id="arSize" type="range" min="22" max="80" value="38"></label>
+    <label>Speed <select id="rate"><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option></select></label>
+  </div>
+
+  <div class="bar">
+    <button class="primary" id="load">Load</button>
+    <button id="prev">◀ Prev</button>
+    <button id="toggle">▶ Play</button>
+    <button id="next">Next ▶</button>
+    <button id="float">⧉ Float</button>
+    <span class="status" id="status">Loading lists…</span>
+  </div>
+
+  <div id="stage">
+    <div class="sub" id="sub">
+      <div class="ar" id="ar">بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ</div>
+      <div class="tr" id="tr"></div>
+      <div class="meta" id="meta">Choose a surah and press Load</div>
+    </div>
+  </div>
+</div>
+
+<audio id="audio" preload="auto"></audio>
+<audio id="pre" preload="auto"></audio>
+
+<script>
+const API = 'https://api.alquran.cloud/v1';
+const $ = id => document.getElementById(id);
+const audio = $('audio'), pre = $('pre');
+let ayahs = [], idx = 0, reps = 0, surahName = '', pipWin = null;
+
+async function api(path){
+  const r = await fetch(API + path);
+  const d = await r.json();
+  if (d.code !== 200) throw new Error(d.data || 'API error');
+  return d.data;
+}
+const status = t => $('status').textContent = t;
+
+async function init(){
+  try{
+    const [surahs, reciters, trans] = await Promise.all([
+      api('/surah'),
+      api('/edition?format=audio&type=versebyverse'),
+      api('/edition?format=text&type=translation'),
+    ]);
+    $('surah').innerHTML = surahs.map(s =>
+      `<option value="${s.number}">${s.number}. ${s.englishName} — ${s.name} (${s.numberOfAyahs})</option>`).join('');
+    reciters.sort((a,b)=>a.englishName.localeCompare(b.englishName));
+    $('reciter').innerHTML = reciters.map(r =>
+      `<option value="${r.identifier}" ${r.identifier==='ar.alafasy'?'selected':''}>${r.englishName} (${r.language})</option>`).join('');
+    trans.sort((a,b)=>a.language.localeCompare(b.language)||a.englishName.localeCompare(b.englishName));
+    $('trans').innerHTML = '<option value="">— none —</option>' + trans.map(t =>
+      `<option value="${t.identifier}" ${t.identifier==='en.sahih'?'selected':''}>[${t.language}] ${t.englishName}</option>`).join('');
+    restore();
+    status('Ready');
+  }catch(e){ status('Could not load the lists: ' + e.message); }
+}
+
+async function load(){
+  audio.pause();
+  const s = $('surah').value, rec = $('reciter').value, tr = $('trans').value;
+  status('Loading surah…');
+  try{
+    const eds = ['quran-uthmani', rec, tr].filter(Boolean).join(',');
+    const data = await api(`/surah/${s}/editions/${eds}`);
+    const text = data[0], aud = data[1], trn = tr ? data[2] : null;
+    surahName = `${text.englishName} · ${text.name}`;
+    ayahs = text.ayahs.map((a,i)=>({
+      n: a.numberInSurah,
+      ar: a.text,
+      tr: trn ? trn.ayahs[i].text : '',
+      audio: aud.ayahs[i].audio,
+      audio2: (aud.ayahs[i].audioSecondary||[])[0],
+    }));
+    $('start').max = ayahs.length;
+    idx = Math.min(Math.max(+$('start').value - 1, 0), ayahs.length - 1);
+    save();
+    show();
+    status(`Loaded ${ayahs.length} ayahs`);
+    if ($('mode').value === 'play') playCurrent();
+  }catch(e){ status('Error: ' + e.message); }
+}
+
+function show(){
+  const a = ayahs[idx]; if (!a) return;
+  for (const doc of docs()){
+    const sub = doc.getElementById('sub');
+    doc.getElementById('ar').textContent = a.ar + ' ﴿' + toArNum(a.n) + '﴾';
+    doc.getElementById('tr').textContent = a.tr;
+    doc.getElementById('meta').textContent = `${surahName} — ${a.n}/${ayahs.length}`;
+    sub.classList.remove('flash'); void sub.offsetWidth; sub.classList.add('flash');
+  }
+  $('start').value = a.n;
+  if ('mediaSession' in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({title:`${surahName} : ${a.n}`, artist: $('reciter').selectedOptions[0]?.text||''});
+  }
+}
+const docs = () => pipWin ? [pipWin.document] : [document];
+const toArNum = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+
+function playCurrent(){
+  const a = ayahs[idx]; if (!a) return;
+  audio.src = a.audio;
+  audio.playbackRate = +$('rate').value;
+  audio.play().catch(()=>status('Press Play to start the audio'));
+  reps = 1;
+  const n = ayahs[idx+1]; if (n) pre.src = n.audio;
+}
+audio.addEventListener('ended', ()=>{
+  if (reps < +$('repeat').value){ reps++; audio.currentTime = 0; audio.play(); return; }
+  if (idx < ayahs.length - 1){ idx++; show(); playCurrent(); }
+  else status('Surah finished ✔');
+});
+audio.addEventListener('error', ()=>{
+  const a = ayahs[idx];
+  if (a && a.audio2 && audio.src !== a.audio2){ audio.src = a.audio2; audio.play(); }
+});
+audio.addEventListener('play', ()=>$('toggle').textContent='⏸ Pause');
+audio.addEventListener('pause', ()=>$('toggle').textContent='▶ Play');
+
+function go(d){
+  if (!ayahs.length) return;
+  idx = Math.min(Math.max(idx + d, 0), ayahs.length - 1);
+  show(); save();
+  if ($('mode').value === 'play' && !audio.paused) playCurrent();
+}
+function toggle(){
+  if (!ayahs.length) return load();
+  if ($('mode').value === 'follow') return go(1);
+  if (audio.paused){ audio.src && audio.src.includes(ayahs[idx].audio) ? audio.play() : playCurrent(); }
+  else audio.pause();
+}
+
+/* ---- floating always-on-top window ---- */
+async function float(){
+  if (pipWin){ pipWin.close(); return; }
+  const sub = $('sub');
+  if ('documentPictureInPicture' in window){
+    pipWin = await documentPictureInPicture.requestWindow({width: 720, height: 220});
+  } else {
+    pipWin = window.open('', 'quransub', 'width=720,height=220');
+    if (!pipWin){ status('The popup was blocked'); return; }
+    pipWin.document.title = 'Quran Subtitles';
+  }
+  const d = pipWin.document;
+  [...document.styleSheets].forEach(ss=>{
+    try{ const st = d.createElement('style'); st.textContent=[...ss.cssRules].map(r=>r.cssText).join('\n'); d.head.appendChild(st); }
+    catch{ const l = d.createElement('link'); l.rel='stylesheet'; l.href=ss.href; d.head.appendChild(l); }
+  });
+  d.body.style.cssText = 'margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;padding:8px;box-sizing:border-box';
+  d.documentElement.style.cssText = document.documentElement.style.cssText;
+  d.body.style.flexDirection = 'column';
+  d.body.appendChild(sub);
+  const ctl = d.createElement('div');
+  ctl.style.cssText = 'display:flex;gap:6px;margin-top:6px;opacity:.35;transition:opacity .2s';
+  ctl.onmouseenter = ()=>ctl.style.opacity = 1; ctl.onmouseleave = ()=>ctl.style.opacity = .35;
+  [['◀', ()=>go(-1)], ['⏯', toggle], ['▶', ()=>go(1)], ['A−', ()=>bump(-4)], ['A+', ()=>bump(4)]].forEach(([t,fn])=>{
+    const b = d.createElement('button'); b.textContent = t; b.onclick = fn;
+    b.style.cssText = 'background:#222;color:#fff;border:1px solid #444;border-radius:6px;padding:2px 10px;cursor:pointer';
+    ctl.appendChild(b);
+  });
+  d.body.appendChild(ctl);
+  d.addEventListener('keydown', keys);
+  $('float').textContent = '✕ Unfloat';
+  pipWin.addEventListener('pagehide', ()=>{
+    ctl.remove(); $('stage').appendChild(sub); pipWin = null; $('float').textContent = '⧉ Float';
+  });
+}
+
+function keys(e){
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowRight' || e.key === 'n'){ e.preventDefault(); go(1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'p'){ e.preventDefault(); go(-1); }
+  else if (e.key === ' '){ e.preventDefault(); toggle(); }
+  else if (e.key === 'f'){ float(); }
+}
+document.addEventListener('keydown', keys);
+
+if ('mediaSession' in navigator){
+  navigator.mediaSession.setActionHandler('nexttrack', ()=>go(1));
+  navigator.mediaSession.setActionHandler('previoustrack', ()=>go(-1));
+}
+
+/* ---- settings ---- */
+function applySize(){
+  const v = +$('arSize').value;
+  document.documentElement.style.setProperty('--ar-size', v + 'px');
+  document.documentElement.style.setProperty('--tr-size', Math.round(v*0.45) + 'px');
+  if (pipWin) pipWin.document.documentElement.style.cssText = document.documentElement.style.cssText;
+}
+function bump(d){ $('arSize').value = +$('arSize').value + d; applySize(); save(); }
+const FIELDS = ['surah','reciter','trans','mode','start','repeat','arSize','rate'];
+function save(){ try{ localStorage.qs = JSON.stringify(Object.fromEntries(FIELDS.map(f=>[f,$(f).value]))); }catch{} }
+function restore(){ try{ const o = JSON.parse(localStorage.qs||'{}'); FIELDS.forEach(f=>{ if(o[f]!=null) $(f).value=o[f]; }); }catch{} applySize(); }
+
+$('load').onclick = load;
+$('prev').onclick = ()=>go(-1);
+$('next').onclick = ()=>go(1);
+$('toggle').onclick = toggle;
+$('float').onclick = float;
+$('arSize').oninput = ()=>{ applySize(); save(); };
+$('rate').onchange = ()=>{ audio.playbackRate = +$('rate').value; save(); };
+['mode','repeat','trans','reciter','surah'].forEach(f=>$(f).addEventListener('change', save));
+init();
+</script>
+</body>
+</html>
