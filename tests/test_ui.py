@@ -101,3 +101,25 @@ def test_wheel_over_dropdown_scrolls_page_not_value(qapp):
         assert cb.currentIndex() == 5 and sp.value() == 5
     finally:
         qapp.removeEventFilter(g)
+
+
+def test_click_on_searchable_dropdown_text_opens_list_and_typing_searches(qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from PySide6.QtWidgets import QComboBox, QFontComboBox
+
+    from quran_companion.settings_ui.widgets import input_guard
+    g = input_guard.install(qapp)
+    try:
+        cb = QComboBox(); cb.setEditable(True); cb.addItems(["1. Al-Fatiha", "2. Al-Baqara", "36. Yaseen"]); cb.show()
+        QTest.qWait(10)
+        QTest.mouseClick(cb.lineEdit(), Qt.LeftButton, Qt.NoModifier, cb.lineEdit().rect().center())
+        QTest.qWait(30)
+        assert cb.view().isVisible()
+        QTest.keyClick(cb.view(), Qt.Key_Y, Qt.NoModifier)
+        QTest.qWait(30)
+        assert not cb.view().isVisible() and cb.lineEdit().text() == "y"
+        fc = QFontComboBox(); fc.resize(300, 36); fc.show(); QTest.qWait(30)
+        assert fc.view().window().width() == 300
+    finally:
+        qapp.removeEventFilter(g)
