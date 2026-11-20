@@ -41,7 +41,7 @@ class ReciteMode(Mode):
         if p.take_ended():
             self._ended(); return
         pos = p.position()
-        if not p.active() or p.paused or pos is None or not self.times: return
+        if not p.active() or pos is None or not self.times: return      # paused: still show where it is
         ms = pos * 1000
         i = max(0, bisect.bisect_right(self.starts, ms) - 1)
         t = self.times[i]

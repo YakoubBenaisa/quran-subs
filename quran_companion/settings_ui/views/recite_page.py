@@ -24,6 +24,7 @@ from ..viewmodels import CatalogViewModel, DownloadsViewModel, MineViewModel
 from ..widgets.basic import FitStack, card, field, lbl, page_header, page_layout, segmented, slider, switch
 from ..widgets.reciter_delegate import DOWNLOADED_ROLE, RECITER_ROLE, ReciterDelegate
 from ..widgets.smooth_scroll import SmoothScroll
+from .browser_panel import BrowserMediaViewModel, BrowserPanel
 from .link_panel import LinkPanel
 
 
@@ -37,6 +38,7 @@ class RecitePage(QWidget):
         super().__init__()
         self.catalog, self.downloads, self.s, self.mine = catalog, downloads, s, mine
         self.link: LinkPanel | None = None
+        self.browser: BrowserPanel | None = None
         root = QVBoxLayout(self); root.setContentsMargins(0, 0, 0, 0)
         w, v = page_layout(); root.addWidget(w)
         page_header(v, T("recite_title"), T("recite_sub"), "book")
@@ -148,7 +150,7 @@ class RecitePage(QWidget):
         self.reccount = lbl(T("loading"), "small"); row.addWidget(self.reccount); cv.addLayout(row)
         self.srcg = None
         if self.mine is not None:
-            sw, self.srcg = segmented([T("src_reciters"), T("src_link")])
+            sw, self.srcg = segmented([T("src_reciters"), T("src_link"), T("src_browser")])
             self.srcg.idClicked.connect(self._source_changed)
             cv.addWidget(sw)
         self.sources = FitStack(); self.sources.setObjectName("modeopts")
@@ -173,6 +175,11 @@ class RecitePage(QWidget):
             self.link.surah_guessed.connect(self.set_surah)
             self.link.recording_ready.connect(self._recording_ready)
             self.sources.addWidget(self.link)
+            self.browser = BrowserPanel(self.mine, self.catalog, BrowserMediaViewModel(self.catalog.bg), self.surah_number)
+            self.browser.surah_guessed.connect(self.set_surah)
+            self.browser.follow_requested.connect(self._follow)
+            self.mine.synced.connect(lambda *_: self.catalog.refresh_reciters())
+            self.sources.addWidget(self.browser)
         self.sources.show_index(0)
         cr.setMinimumWidth(380)
         return cr
@@ -186,6 +193,15 @@ class RecitePage(QWidget):
 
     def _reciters_changed(self) -> None:
         self.fill_reciters(); self.reccount.setText(T("n_reciters", n=len(self.catalog.reciters)))
+
+    def _follow(self, rid: int) -> None:
+        self.catalog.refresh_reciters(); self.select_reciter(rid)
+        self.start_requested.emit()
+
+    def follow_values(self) -> dict:
+        """follow_player / follow_url for the settings: set only while the browser tab is chosen."""
+        t = self.browser.follow_target() if self.browser and self.sources.currentWidget() is self.browser else None
+        return {"follow_player": t[0], "follow_url": t[1]} if t else {"follow_player": "", "follow_url": ""}
 
     def _recording_ready(self, rid: int) -> None:
         self.catalog.refresh_reciters()
@@ -289,6 +305,10 @@ class RecitePage(QWidget):
                  hint_words=self.hintwords.value(), hint_delay=float(self.hintdelay.value()))
         r = self.reciter()
         if r: d["reciter"] = r.id
+        d.update(self.follow_values())
+        if d["follow_player"]:
+            rec = self.mine.for_video(d["follow_url"]) if self.mine else None
+            if rec: d["reciter"], d["mode"] = rec.reciter_id, "recite"
         if self.catalog.ready:
             a, b = self.ayah.value(), self.ayah_to.value()
             d.update(surah=self.surah_number(), ayah=a, range_from=a, range_to=b if b >= a else 0)

@@ -3,6 +3,7 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, Signal
 
+from ...core.guess import same_video
 from ...core.i18n import T
 from ...core.models import MyRecitation
 from ...data.media import MissingTool
@@ -11,8 +12,8 @@ from ..background import Background
 
 
 class MineViewModel(QObject):
-    inspected = Signal(object)          # sync.service.Inspection
-    inspect_failed = Signal(str)
+    inspected = Signal(str, object)     # tag, sync.service.Inspection
+    inspect_failed = Signal(str, str)   # tag, message
     progress = Signal(str, float)       # stage message, 0..1
     synced = Signal(object)             # MyRecitation
     sync_failed = Signal(str)
@@ -37,16 +38,21 @@ class MineViewModel(QObject):
         return self.repo.my_recitations()
 
     # ------------------------------------------------------------ inspect
-    def inspect(self, src: str) -> None:
+    def inspect(self, src: str, tag: str = "link") -> None:
+        """tag tells the panels apart (the link panel and the browser panel share this view model)."""
         self._inspect_id += 1
         iid = self._inspect_id
-        self.bg.run(lambda: self.service.inspect(src), lambda res: self._on_inspected(iid, res))
+        self.bg.run(lambda: self.service.inspect(src), lambda res: self._on_inspected(iid, tag, res))
 
-    def _on_inspected(self, iid: int, res) -> None:
+    def _on_inspected(self, iid: int, tag: str, res) -> None:
         if iid != self._inspect_id: return       # a newer link was given meanwhile
-        if isinstance(res, MissingTool): self.inspect_failed.emit(T("need_ytdlp"))
-        elif isinstance(res, Exception): self.inspect_failed.emit(str(res) or type(res).__name__)
-        else: self.inspected.emit(res)
+        if isinstance(res, MissingTool): self.inspect_failed.emit(tag, T("need_ytdlp"))
+        elif isinstance(res, Exception): self.inspect_failed.emit(tag, str(res) or type(res).__name__)
+        else: self.inspected.emit(tag, res)
+
+    def for_video(self, url: str) -> MyRecitation | None:
+        """The recording made from this video, if any."""
+        return next((m for m in self.recordings() if same_video(m.source, url)), None)
 
     # ------------------------------------------------------------ sync
     def sync(self, inspection, surah: int, ayah_from: int, ayah_to: int) -> None:

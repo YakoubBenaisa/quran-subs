@@ -5,7 +5,7 @@ import re
 import signal
 import subprocess
 import threading
-from typing import Protocol
+from typing import Callable, Protocol
 
 
 class AudioPlayer(Protocol):
@@ -122,3 +122,32 @@ class FakePlayer:
             self._active = False; self.ended = False
             return True
         return False
+
+
+class RoutingPlayer:
+    """Plays the audio itself (ffplay) or follows a browser video, as the settings say at play()."""
+    def __init__(self, own: AudioPlayer, browser, settings, features_for: Callable[[str], str]):
+        """settings() -> Settings; features_for(audio path) -> features file of that recording."""
+        self.own, self.browser, self.settings, self.features_for = own, browser, settings, features_for
+        self.cur: AudioPlayer = own
+
+    def play(self, src: str, start: float, speed: float = 1.0, volume: int = 100) -> None:
+        self.cur.stop()
+        s = self.settings()
+        if s.follow_player and self.browser is not None:
+            self.browser.follow(s.follow_player, s.follow_url)
+            self.cur = self.browser
+            self.cur.play(self.features_for(src), start, speed, volume)
+        else:
+            self.cur = self.own
+            self.cur.play(src, start, speed, volume)
+
+    def stop(self) -> None: self.cur.stop()
+    def set_paused(self, paused: bool) -> None: self.cur.set_paused(paused)
+
+    @property
+    def paused(self) -> bool: return self.cur.paused
+
+    def active(self) -> bool: return self.cur.active()
+    def position(self) -> float | None: return self.cur.position()
+    def take_ended(self) -> bool: return self.cur.take_ended()

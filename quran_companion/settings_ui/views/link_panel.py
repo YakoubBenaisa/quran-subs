@@ -37,6 +37,7 @@ class LinkPanel(QWidget):
         super().__init__()
         self.vm, self.catalog, self.current_surah = vm, catalog, current_surah
         self.inspection = None
+        self._mine = False              # a sync started here (the browser panel shares the view model)
         v = QVBoxLayout(self); v.setContentsMargins(0, 4, 0, 0); v.setSpacing(10)
         v.addWidget(lbl(T("link_sub"), "muted", True))
 
@@ -117,7 +118,8 @@ class LinkPanel(QWidget):
     def _show_info(self, html: str) -> None:
         self.info.setText(html); self.info.show()
 
-    def _on_inspected(self, ins) -> None:
+    def _on_inspected(self, tag: str, ins) -> None:
+        if tag != "link": return
         self.inspection = ins
         title = ins.info.title.replace("<", "&lt;")
         dur = f" &nbsp;·&nbsp; {T('duration_min', m=max(1, round(ins.info.duration / 60)))}" if ins.info.duration else ""
@@ -132,7 +134,8 @@ class LinkPanel(QWidget):
         self._update_range_max()
         self.b_sync.setEnabled(not self.vm.busy)
 
-    def _on_inspect_failed(self, err: str) -> None:
+    def _on_inspect_failed(self, tag: str, err: str) -> None:
+        if tag != "link": return
         self.inspection = None
         self._show_info(f"<span style='color:#ef4444'>{err}</span>")
 
@@ -148,21 +151,27 @@ class LinkPanel(QWidget):
     def _sync(self) -> None:
         if not self.inspection: return
         self.status.setText(""); self.prog.setValue(0)
+        self._mine = True
         self.vm.sync(self.inspection, self.current_surah(), self.a_from.value(), self.a_to.value())
 
     def _on_progress(self, msg: str, f: float) -> None:
+        if not self._mine: return
         self.status.setText(msg); self.prog.setValue(int(f * 1000))
 
     def _on_synced(self, m: MyRecitation) -> None:
+        if not self._mine: return
+        self._mine = False
         self.status.setText(T("synced", n=len([t for t in m.timings if t.ayah]), q=self.vm.quality_text(m)))
         self.recording_ready.emit(m.reciter_id)
 
     def _on_sync_failed(self, err: str) -> None:
+        if not self._mine: return
+        self._mine = False
         self.status.setText(f"<span style='color:#ef4444'>{err}</span>")
 
     def _on_busy(self, busy: bool) -> None:
         self.b_sync.setEnabled(not busy and self.inspection is not None)
-        self.b_cancel.setVisible(busy); self.prog.setVisible(busy)
+        self.b_cancel.setVisible(busy and self._mine); self.prog.setVisible(busy and self._mine)
 
     # ------------------------------------------------------------ my recordings
     def fill(self) -> None:

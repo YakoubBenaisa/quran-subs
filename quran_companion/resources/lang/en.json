@@ -180,5 +180,17 @@
  "mine_dl": "Your recording is already on this computer.",
  "duration_min": "{m} min",
  "delete": "Remove",
- "delete_rec_title": "Remove recording"
+ "delete_rec_title": "Remove recording",
+ "src_browser": "Video in browser",
+ "browser_sub": "Play a recitation video in Firefox or Chrome, then pick it here. It is synced once; after that the verses follow the video, even when you pause or skip.",
+ "listen_note": "To find where the video is, the app listens to your speakers for a few seconds now and then. Nothing is recorded or sent anywhere.",
+ "browser_none": "Nothing is playing in a browser right now. Start the video, then it appears here.",
+ "browser_unavailable": "Can't see browser players: {err}",
+ "b_playing": "playing",
+ "b_paused": "paused",
+ "browser_ready": "Synced  ·  quality: {q}",
+ "browser_needs_sync": "Not synced yet. Syncing takes about a minute for a long surah.",
+ "sync_video": "Sync this video",
+ "follow_video": "Follow this video",
+ "no_video_link": "This player does not share the video's link, so it can't be synced."
 }
