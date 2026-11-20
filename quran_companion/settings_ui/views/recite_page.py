@@ -20,10 +20,11 @@ from ...core.settings import ADVANCE, HINTS, MODES, Settings
 from ...overlay.painter import register_fonts
 from ..theme.icons import icon
 from ..theme.tokens import C
-from ..viewmodels import CatalogViewModel, DownloadsViewModel
+from ..viewmodels import CatalogViewModel, DownloadsViewModel, MineViewModel
 from ..widgets.basic import FitStack, card, field, lbl, page_header, page_layout, segmented, slider, switch
 from ..widgets.reciter_delegate import DOWNLOADED_ROLE, RECITER_ROLE, ReciterDelegate
 from ..widgets.smooth_scroll import SmoothScroll
+from .link_panel import LinkPanel
 
 
 class RecitePage(QWidget):
@@ -32,9 +33,10 @@ class RecitePage(QWidget):
     surah_changed = Signal(int)
     translation_changed = Signal(str)
 
-    def __init__(self, s: Settings, catalog: CatalogViewModel, downloads: DownloadsViewModel):
+    def __init__(self, s: Settings, catalog: CatalogViewModel, downloads: DownloadsViewModel, mine: MineViewModel | None = None):
         super().__init__()
-        self.catalog, self.downloads, self.s = catalog, downloads, s
+        self.catalog, self.downloads, self.s, self.mine = catalog, downloads, s, mine
+        self.link: LinkPanel | None = None
         root = QVBoxLayout(self); root.setContentsMargins(0, 0, 0, 0)
         w, v = page_layout(); root.addWidget(w)
         page_header(v, T("recite_title"), T("recite_sub"), "book")
@@ -53,6 +55,7 @@ class RecitePage(QWidget):
         self._mode_changed(self.modeg.checkedId()); self.advopts.show_index(self.adv.currentIndex()); self._hint_changed()
         catalog.loaded.connect(self.populate)
         catalog.failed.connect(self._on_failed)
+        catalog.reciters_changed.connect(self._reciters_changed)
         if catalog.ready: self.populate()
 
     # ---------------------------------------------------------------- building
@@ -143,6 +146,16 @@ class RecitePage(QWidget):
         cr, cv = card()
         row = QHBoxLayout(); row.addWidget(lbl(T("reciter"), "h2")); row.addStretch()
         self.reccount = lbl(T("loading"), "small"); row.addWidget(self.reccount); cv.addLayout(row)
+        self.srcg = None
+        if self.mine is not None:
+            sw, self.srcg = segmented([T("src_reciters"), T("src_link")])
+            self.srcg.idClicked.connect(self._source_changed)
+            cv.addWidget(sw)
+        self.sources = FitStack(); self.sources.setObjectName("modeopts")
+        listpage = QWidget(); lv = QVBoxLayout(listpage); lv.setContentsMargins(0, 0, 0, 0); lv.setSpacing(12)
+        self.sources.addWidget(listpage)
+        cv.addWidget(self.sources, 1)
+        cv = lv                                   # the reciter list goes on the first page
         self.search = QLineEdit(); self.search.setPlaceholderText(T("search_reciter"))
         self.search.setClearButtonEnabled(True); self.search.textChanged.connect(self._filter)
         self.search.addAction(icon("search", C["MUTED"]), QLineEdit.LeadingPosition)
@@ -151,12 +164,32 @@ class RecitePage(QWidget):
         self.reclist.setMouseTracking(True); self.reclist.setMinimumHeight(340)
         self.reclist.setVerticalScrollMode(QListWidget.ScrollPerPixel); self.reclist.verticalScrollBar().setSingleStep(24)
         SmoothScroll(self.reclist, 1.0)
-        self.reclist.currentItemChanged.connect(lambda *_: self.reciter_changed.emit(self.reciter()))
+        self.reclist.currentItemChanged.connect(self._reciter_selected)
         self.reclist.itemDoubleClicked.connect(lambda *_: self.start_requested.emit())
         cv.addWidget(self.reclist, 1)
         self.rechint = lbl("", "small", True); cv.addWidget(self.rechint)
+        if self.mine is not None:
+            self.link = LinkPanel(self.mine, self.catalog, self.surah_number)
+            self.link.surah_guessed.connect(self.set_surah)
+            self.link.recording_ready.connect(self._recording_ready)
+            self.sources.addWidget(self.link)
+        self.sources.show_index(0)
         cr.setMinimumWidth(380)
         return cr
+
+    # ---------------------------------------------------------------- sources
+    def _source_changed(self, i: int) -> None:
+        self.sources.show_index(i)
+
+    def set_surah(self, n: int) -> None:
+        if 1 <= n <= self.surah.count() and n != self.surah_number(): self.surah.setCurrentIndex(n - 1)
+
+    def _reciters_changed(self) -> None:
+        self.fill_reciters(); self.reccount.setText(T("n_reciters", n=len(self.catalog.reciters)))
+
+    def _recording_ready(self, rid: int) -> None:
+        self.catalog.refresh_reciters()
+        self.select_reciter(rid)
 
     # ---------------------------------------------------------------- behaviour
     def _on_failed(self, _err: str) -> None:
@@ -205,8 +238,15 @@ class RecitePage(QWidget):
         self._filter(self.search.text())
         if self.reclist.currentItem(): self.reclist.scrollToItem(self.reclist.currentItem(), QListWidget.PositionAtCenter)
 
+    def _reciter_selected(self, *_) -> None:
+        r = self.reciter()
+        if r and r.mine:
+            n = self.catalog.my_surah(r)
+            if n: self.set_surah(n)
+        self.reciter_changed.emit(r)
+
     def select_reciter(self, rid: int) -> None:
-        self.search.clear(); self.fill_reciters(rid); self.reciter_changed.emit(self.reciter())
+        self.search.clear(); self.fill_reciters(rid); self._reciter_selected()
 
     def _filter(self, q: str) -> None:
         for i in range(self.reclist.count()):
@@ -217,6 +257,7 @@ class RecitePage(QWidget):
         if n:
             self.ayah.setMaximum(n); self.ayah.setValue(1); self.ayah_to.setMaximum(n); self.ayah_to.setValue(0)
         self._show_surah_info()
+        if self.link: self.link.surah_changed()
         self.surah_changed.emit(self.surah_number())
 
     def _show_surah_info(self) -> None:

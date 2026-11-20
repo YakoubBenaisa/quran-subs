@@ -28,7 +28,7 @@ class _Bridge(QObject):
 
 class OverlayController:
     def __init__(self, repo: QuranRepository, store: SettingsStore, player: AudioPlayer, socket_path: str,
-                 start_hidden: bool = False):
+                 start_hidden: bool = False, corrector=None):
         register_fonts()
         self.store = store
         tr.set(store.load().ui_lang)
@@ -40,7 +40,7 @@ class OverlayController:
         self.bridge.command.connect(self.handle)
         self.session = Session(repo, player, MonotonicClock(), store,
                                lambda s: make_paginator(s, self.window.screen_width() * s.max_width / 100),
-                               listener=self, runner=self._run_async)
+                               listener=self, runner=self._run_async, corrector=corrector)
         self.server = CommandServer(socket_path, self.bridge.command.emit)
         self.timer = QTimer(); self.timer.timeout.connect(self.session.tick)
         store.update(visible=not start_hidden, ov_pid=os.getpid(), ov_version=PROTOCOL_VERSION)

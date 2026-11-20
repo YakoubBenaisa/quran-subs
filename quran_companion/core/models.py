@@ -1,6 +1,8 @@
 """Domain models. Plain dataclasses, no I/O."""
 from dataclasses import dataclass, field
 
+MINE_BASE = 1_000_000   # reciter ids from here on are the user's own synced recordings
+
 
 @dataclass(frozen=True)
 class Reciter:
@@ -10,6 +12,11 @@ class Reciter:
     style: str
     folder: str          # base URL of the whole-surah mp3 files
     count: int = 114     # surahs available
+
+    @property
+    def mine(self) -> bool:
+        """One of the user's own recordings (a link or file synced automatically)."""
+        return self.id >= MINE_BASE
 
     @property
     def slug(self) -> str:
@@ -59,6 +66,33 @@ class VerseTiming:
     ayah: int            # 0 = intro (isti'adha / basmala)
     start_ms: int
     end_ms: int
+
+
+@dataclass
+class MyRecitation:
+    """A recording the user added (YouTube video, MP3 link or file) with verse timings found
+    automatically, corrected by the user's anchors."""
+    id: int
+    title: str
+    source: str                      # what the user gave: link or file path
+    audio: str                       # local audio file
+    surah: int
+    ayahs: list[int]                 # verses in the recording, 0 = intro
+    timings: list[VerseTiming] = field(default_factory=list)
+    anchors: dict[int, float] = field(default_factory=dict)    # ayah -> start (s), set by the user
+    confident: float = 0.0           # share of verses the references agreed on
+    reciter_name: str = ""           # recognised from the title, if any
+    created: float = 0.0
+
+    @property
+    def reciter_id(self) -> int:
+        return MINE_BASE + self.id
+
+    def as_reciter(self) -> Reciter:
+        return Reciter(self.reciter_id, self.title, self.title, self.reciter_name, "", 1)
+
+    def quality(self) -> str:
+        return "good" if self.confident >= 0.8 else "fair" if self.confident >= 0.5 else "poor"
 
 
 @dataclass

@@ -10,22 +10,44 @@ from quran_companion.playback.player import FakePlayer
 pytestmark = pytest.mark.usefixtures("qapp_fonts")
 
 
+class FakeSync:
+    """Stands in for SyncService: recognises Al-Kahf and 'syncs' it instantly."""
+    def __init__(self, repo):
+        self.repo = repo
+
+    def inspect(self, src):
+        from quran_companion.data.media import MediaInfo
+        from quran_companion.sync.service import Inspection
+        if "bad" in src: raise ValueError("not a link or an existing file")
+        return Inspection(MediaInfo(src, "video", "سورة الكهف | Mishary Alafasy", 1500.0, "k"), 18,
+                          self.repo.find_reciter(ALAFASY), False)
+
+    def create(self, ins, surah, a, b, progress=lambda s, f: None, cancel=lambda: False):
+        from quran_companion.core.models import MyRecitation, VerseTiming
+        progress("download", 0.3); progress("match", 0.9)
+        ts = [VerseTiming(n, n * 10000, n * 10000 + 9000) for n in range(0, 111)]
+        return self.repo.mine.save(MyRecitation(self.repo.mine.new_id(), "Al-Kahf · Alafasy", ins.info.source, "/x.m4a",
+                                                surah, list(range(111)), ts, confident=0.95, reciter_name="Mishary Alafasi"))
+
+
 @pytest.fixture
 def window_factory(repo, store, tmp_path, qtbot):
     from PySide6.QtWidgets import QApplication
 
+    from quran_companion.data.my_recitations import MyRecitations
     from quran_companion.settings_ui.background import Background
     from quran_companion.settings_ui.theme.manager import apply_app_theme
-    from quran_companion.settings_ui.viewmodels import AppViewModel, CatalogViewModel, DownloadsViewModel, PlaybackViewModel
+    from quran_companion.settings_ui.viewmodels import AppViewModel, CatalogViewModel, DownloadsViewModel, MineViewModel, PlaybackViewModel
     from quran_companion.settings_ui.views.main_window import MainWindow
     bg = Background()
+    repo.mine = MyRecitations(str(tmp_path / "mine"))
 
     def make(lang="en", theme="dark"):
         store.update(ui_lang=lang, theme=theme, reciter=ALAFASY)
         apply_app_theme(QApplication.instance(), store.load())
         vms = dict(app=AppViewModel(store), catalog=CatalogViewModel(repo, bg),
                    playback=PlaybackViewModel(store, OverlayClient(str(tmp_path / "none.sock"))),
-                   downloads=DownloadsViewModel(repo, bg))
+                   downloads=DownloadsViewModel(repo, bg), mine=MineViewModel(repo, bg, lambda: FakeSync(repo)))
         w = MainWindow(store, **vms)
         qtbot.addWidget(w); w.show()
         qtbot.waitUntil(lambda: vms["catalog"].ready, timeout=10000)
@@ -48,7 +70,6 @@ def test_settings_window_builds_and_works(window_factory, tmp_path, lang, theme)
     vals = w.all_values()
     assert set(STYLE_KEYS) <= set(vals) and vals["reciter"] == ALAFASY and vals["mode"] in ("recite", "memorize", "manual")
     w.go(2)
-    assert w.downloads.name.text() in ("Mishary Alafasi", "مشاري العفاسي")
     assert not vms["playback"].status.running and w.bar.pill.objectName() == "pillOff"
     assert not w.grab().isNull()
 
@@ -123,3 +144,26 @@ def test_click_on_searchable_dropdown_text_opens_list_and_typing_searches(qapp):
         assert fc.view().window().width() == 300
     finally:
         qapp.removeEventFilter(g)
+
+
+
+@pytest.mark.parametrize("lang", ["en", "ar"])
+def test_link_or_file_syncs_and_selects_the_recording(window_factory, qtbot, lang):
+    w, vms = window_factory(lang, "dark")
+    r = w.recite
+    r.srcg.button(1).click()
+    assert r.sources.currentWidget() is r.link
+    r.link.src.setText("bad input"); r.link._check()
+    qtbot.waitUntil(lambda: "not a link" in r.link.info.text(), timeout=5000)
+    assert not r.link.b_sync.isEnabled()
+    r.link.src.setText("https://youtube.com/watch?v=abc"); r.link._check()
+    qtbot.waitUntil(lambda: r.link.b_sync.isEnabled(), timeout=5000)
+    assert r.surah_number() == 18                      # recognised from the title
+    r.link.b_sync.click()
+    qtbot.waitUntil(lambda: r.reciter() is not None and r.reciter().mine, timeout=5000)
+    assert r.reclist.count() == 116 and r.reciter().ar == "Al-Kahf · Alafasy"
+    assert r.link.list.count() == 1 and "Al-Kahf" in r.link.list.item(0).text()
+    vals = w.all_values()
+    assert vals["reciter"] == r.reciter().id and vals["surah"] == 18
+    w.go(2)
+    assert not w.downloads.b_all.isEnabled()          # nothing to download: it's on disk

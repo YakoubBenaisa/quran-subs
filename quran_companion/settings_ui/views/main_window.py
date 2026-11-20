@@ -22,14 +22,14 @@ SIZE, MIN_SIZE = (1140, 840), (960, 660)
 
 class MainWindow(QWidget):
     def __init__(self, store: SettingsStore, app: AppViewModel, catalog: CatalogViewModel,
-                 playback: PlaybackViewModel, downloads: DownloadsViewModel, page: int = RECITE):
+                 playback: PlaybackViewModel, downloads: DownloadsViewModel, page: int = RECITE, mine=None):
         super().__init__()
         self.store, self.app, self.catalog, self.playback = store, app, catalog, playback
         s = store.load()
         self.setWindowTitle(T("app_title")); self.setWindowIcon(QIcon(paths.LOGO))
         self.resize(*SIZE); self.setMinimumSize(*MIN_SIZE)
 
-        self.recite = RecitePage(s, catalog, downloads)
+        self.recite = RecitePage(s, catalog, downloads, mine)
         self.appearance = AppearancePage(s, self.recite.translation)
         self.downloads = DownloadsPage(downloads, catalog, self.recite.reciter, self.recite.surah_number, self.recite.translation)
         self.sidebar = SidebarView(app, s, page)

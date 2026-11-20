@@ -78,6 +78,13 @@ class DownloadsPage(QWidget):
     def refresh(self) -> None:
         r: Reciter | None = self.current_reciter()
         if not r: return
+        if r.mine:
+            self.name.setText(r.name(rtl())); self.sub.setText(T("mine_dl"))
+            self.st_n.setText("1"); self.st_mb.setText("–")
+            if not self.vm.busy: self.prog.setRange(0, 1); self.prog.setValue(1)
+            self.b_all.setEnabled(False); self.b_one.setEnabled(False)
+            return
+        self._on_busy(self.vm.busy)
         st = self.vm.stats(r)
         self.name.setText(r.name(rtl()))
         self.sub.setText(f"{r.en}   ·   {r.short_style}" if rtl() else f"{r.short_style}   ·   {r.ar}")
@@ -91,7 +98,7 @@ class DownloadsPage(QWidget):
 
     def fill_library(self) -> None:
         self.lib.clear()
-        for r, st in self.vm.library(self.catalog.reciters):
+        for r, st in self.vm.library([r for r in self.catalog.reciters if not r.mine]):
             it = QListWidgetItem(f"{r.name(rtl())}      " + T("lib_item", n=st.surahs, mb=f"{st.megabytes:.0f}"))
             it.setData(Qt.UserRole, r); self.lib.addItem(it)
         if not self.lib.count():

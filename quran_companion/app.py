@@ -30,6 +30,26 @@ def run_toggle() -> int:
     return run_overlay([])
 
 
+def make_sync_service(repo):
+    from .data.http import CachedHttp
+    from .data.media import MediaFetcher
+    from .sync.service import SyncService
+    assert repo.mine is not None
+    return SyncService(repo, MediaFetcher(repo.mine.media_dir, CachedHttp(paths.cache_dir())), repo.mine)
+
+
+def make_corrector(repo):
+    """(reciter id, ayah, starts at s) -> new timings, for corrections of the user's own recordings."""
+    service = None
+
+    def correct(rid: int, ayah: int, at: float):
+        nonlocal service
+        if service is None: service = make_sync_service(repo)     # numpy etc. only when needed
+        m = repo.my_recitation(rid)
+        return service.correct(m, ayah, at).timings if m else []
+    return correct
+
+
 def run_overlay(args) -> int:
     import argparse
     ap = argparse.ArgumentParser(prog="quran-companion overlay")
@@ -54,7 +74,9 @@ def run_overlay(args) -> int:
 
     app = QApplication(sys.argv[:1])
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    ctl = OverlayController(default_repository(), st, FfplayPlayer(), paths.socket_path(), start_hidden=a.hidden)
+    repo = default_repository()
+    ctl = OverlayController(repo, st, FfplayPlayer(), paths.socket_path(), start_hidden=a.hidden,
+                            corrector=make_corrector(repo))
     app.aboutToQuit.connect(ctl.shutdown)
     ctl.start()
     return app.exec()
@@ -90,7 +112,7 @@ def run_ui() -> int:
     from .overlay.painter import register_fonts
     from .settings_ui.background import Background
     from .settings_ui.theme.manager import apply_app_theme
-    from .settings_ui.viewmodels import AppViewModel, CatalogViewModel, DownloadsViewModel, PlaybackViewModel
+    from .settings_ui.viewmodels import AppViewModel, CatalogViewModel, DownloadsViewModel, MineViewModel, PlaybackViewModel
     from .settings_ui.views.main_window import MainWindow
     from .settings_ui.widgets import input_guard
 
@@ -100,7 +122,8 @@ def run_ui() -> int:
     input_guard.install(app)
     st, repo, bg = store(), default_repository(), Background()
     vms = dict(app=AppViewModel(st), catalog=CatalogViewModel(repo, bg),
-               playback=PlaybackViewModel(st, OverlayClient()), downloads=DownloadsViewModel(repo, bg))
+               playback=PlaybackViewModel(st, OverlayClient()), downloads=DownloadsViewModel(repo, bg),
+               mine=MineViewModel(repo, bg, lambda: make_sync_service(repo)))
     holder: dict = {}
 
     def build(page: int = 0, geometry=None) -> None:

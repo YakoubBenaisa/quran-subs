@@ -11,6 +11,7 @@ SAMPLE_SURAH, SAMPLE_AYAH, SAMPLE_TRANSLATION = 2, 255, "en.sahih"   # Ayat al-K
 
 class CatalogViewModel(QObject):
     loaded = Signal()
+    reciters_changed = Signal()     # the user's own recordings were added or removed
     failed = Signal(str)
     sample_loaded = Signal(str, str, int)
 
@@ -41,6 +42,16 @@ class CatalogViewModel(QObject):
         if isinstance(res, Ayah):
             self.sample = (res.ar, res.tr, res.n)
             self.sample_loaded.emit(res.ar, res.tr, res.n)
+
+    def refresh_reciters(self) -> None:
+        """Re-read the list after the user's recordings changed (timed reciters stay cached)."""
+        if not self.ready: return
+        self.reciters = self.repo.reciters()
+        self.reciters_changed.emit()
+
+    def my_surah(self, rec: Reciter) -> int | None:
+        m = self.repo.my_recitation(rec)
+        return m.surah if m else None
 
     def find_reciter(self, rid: int) -> Reciter | None:
         return self.repo.find_reciter(rid) if self.reciters else None

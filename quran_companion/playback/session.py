@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Protocol
 
 from ..core.i18n import T
-from ..core.models import Page, Reciter, SurahData
+from ..core.models import Page, Reciter, SurahData, VerseTiming
 from ..core.settings import Settings, SettingsStore
 from ..core.text import SADAQA, intro_text, verse_with_marker
 from ..data.repository import LoadRequest, QuranRepository
@@ -78,10 +78,15 @@ def sync_runner(fn, done):
     done(res)
 
 
+Corrector = Callable[[int, int, float], list[VerseTiming]]   # (reciter id, ayah, starts at s) -> new timings
+
+
 class Session:
     def __init__(self, repo: QuranRepository, player: AudioPlayer, clock: Clock, store: SettingsStore,
-                 paginator_factory: Callable[[Settings], Paginator], listener: Listener, runner: Runner = sync_runner):
+                 paginator_factory: Callable[[Settings], Paginator], listener: Listener, runner: Runner = sync_runner,
+                 corrector: Corrector | None = None):
         self.repo, self.player, self.clock, self.store = repo, player, clock, store
+        self.corrector = corrector          # re-matches the user's own recordings after a correction
         self.paginator_factory, self.listener, self.runner = paginator_factory, listener, runner
         self.state = State.IDLE
         self.s: Settings = store.load()
@@ -181,7 +186,8 @@ class Session:
         if self.state in (State.ACTIVE, State.PAUSED): self._go(State.FINISHED)
 
     def next_surah_or_finish(self) -> None:
-        if self.s.autonext and self.surah < 114 and not self.range_end():
+        mine = self.rec is not None and self.rec.mine          # a recording holds one surah
+        if self.s.autonext and self.surah < 114 and not self.range_end() and not mine:
             self.store.update(range_from=1, range_to=0)
             self.load(self.surah + 1, 1, rng=(1, 0))
         else:

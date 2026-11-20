@@ -39,4 +39,4 @@ ignore = ["E701", "E702", "E741"]   # compact one-line branches are used deliber
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
-files = ["quran_companion/core", "quran_companion/layout", "quran_companion/playback", "quran_companion/ipc", "quran_companion/data"]
+files = ["quran_companion/core", "quran_companion/layout", "quran_companion/playback", "quran_companion/ipc", "quran_companion/data", "quran_companion/sync"]

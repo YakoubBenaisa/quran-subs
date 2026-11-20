@@ -23,3 +23,8 @@ def cache_dir() -> str:
 
 def library_dir() -> str:
     return os.environ.get("QOV_LIB") or os.path.expanduser("~/.local/share/quran-overlay/audio")
+
+
+def mine_dir() -> str:
+    """The user's own synced recordings (links and files)."""
+    return os.environ.get("QOV_MINE") or os.path.expanduser("~/.local/share/quran-overlay/mine")
