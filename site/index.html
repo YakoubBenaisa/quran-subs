@@ -1,0 +1,658 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quran Companion</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Quran verses on your screen while you work, like subtitles over your windows. Recite with 115 reciters, memorize, or follow any recitation. Free for Windows, macOS and Linux.">
+<meta property="og:title" content="Quran Companion · رفيق التلاوة">
+<meta property="og:description" content="Quran verses on your screen while you work. Free for Windows, macOS and Linux.">
+<meta property="og:image" content="screenshots/overlay.png">
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Amiri+Quran&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Reem+Kufi:wght@500;700&display=swap">
+<style>
+/* Layout: a night-sky page; the hero is a live desktop with the verses over it, then features,
+   screenshots and per-system downloads. Gold = the Quran text (mushaf illumination), emerald = actions. */
+:root {
+  --bg: #0b1412;          /* night, a little green */
+  --bg-2: #101c19;
+  --surface: #14231f;
+  --line: #22362f;
+  --fg: #e8efe9;
+  --muted: #93a79c;
+  --accent: #19c58a;      /* the app's emerald */
+  --accent-ink: #04241a;
+  --gold: #f1d49a;        /* verse text on the (always dark) desktop demo */
+  --gold-ink: #f1d49a;    /* gold text on page surfaces */
+  --glow: rgba(25,197,138,.18);
+  --win-light: #eef1ee;
+  --win-dark: #1a2421;
+  --code-1: #7fd1b0; --code-2: #e9b872; --code-3: #9fb4ff;
+  --display: "Bricolage Grotesque", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --display-ar: "Reem Kufi", "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --body: "IBM Plex Sans Arabic", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --quran: "Amiri Quran", "Amiri", "Traditional Arabic", serif;
+  --radius: 14px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f6f2; --bg-2: #e9efe9; --surface: #ffffff; --line: #d3ddd5; --fg: #102019; --muted: #52665b;
+    --accent: #0a9b6a; --accent-ink: #ffffff; --gold: #f1d49a; --gold-ink: #94640f; --glow: rgba(10,155,106,.14);
+    --win-light: #ffffff; --win-dark: #1a2421; color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3f6f2; --bg-2: #e9efe9; --surface: #ffffff; --line: #d3ddd5; --fg: #102019; --muted: #52665b;
+  --accent: #0a9b6a; --accent-ink: #ffffff; --gold: #f1d49a; --gold-ink: #94640f; --glow: rgba(10,155,106,.14);
+  --win-light: #ffffff; --win-dark: #1a2421; color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 400 17px/1.6 var(--body);
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+}
+img { max-width: 100%; display: block; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); line-height: 1.08; margin: 0; text-wrap: balance; letter-spacing: -.02em; }
+[dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3 { font-family: var(--display-ar); letter-spacing: 0; line-height: 1.3; }
+p { margin: 0; }
+.eyebrow { font: 600 13px/1 var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+[dir="rtl"] .eyebrow { letter-spacing: 0; font-size: 15px; }
+
+/* geometric star pattern behind the hero, drawn by canvas */
+#stars { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55; pointer-events: none; }
+
+/* ------------------------------------------------ nav */
+nav.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 78%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+nav.top .wrap { display: flex; align-items: center; gap: 24px; padding-block: 14px; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-weight: 700; }
+.brand img { width: 34px; height: 34px; border-radius: 9px; }
+.brand small { display: block; font: 500 12px/1.2 var(--body); color: var(--muted); }
+.navlinks { display: flex; gap: 22px; margin-inline-start: auto; font-size: 15px; }
+.navlinks a { text-decoration: none; color: var(--muted); transition: color .2s; }
+.navlinks a:hover { color: var(--fg); }
+.lang { border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 999px; padding: 6px 14px; font: 600 14px var(--body); cursor: pointer; }
+.lang:hover { border-color: var(--accent); }
+@media (max-width: 760px) { .navlinks { display: none; } .lang { margin-inline-start: auto; } }
+
+/* ------------------------------------------------ hero */
+.hero { position: relative; overflow: hidden; padding-block: 72px 40px; }
+.hero::after { content: ""; position: absolute; inset: auto -20% -40% -20%; height: 70%; background: radial-gradient(closest-side, var(--glow), transparent); pointer-events: none; }
+.hero .wrap { position: relative; z-index: 1; display: grid; gap: 48px; }
+.hero-copy { max-width: 760px; display: grid; gap: 22px; }
+.hero h1 { font-size: clamp(40px, 6.4vw, 78px); font-weight: 800; }
+.hero h1 em { font-style: normal; color: var(--gold-ink); }
+.hero .lede { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 62ch; }
+.cta { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 12px; font: 600 16px var(--body); text-decoration: none; border: 1px solid transparent; cursor: pointer; transition: transform .15s, box-shadow .2s, background .2s; }
+.btn svg { width: 20px; height: 20px; flex: none; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 10px 30px -10px var(--accent); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -12px var(--accent); }
+.btn-ghost { border-color: var(--line); color: var(--fg); background: color-mix(in srgb, var(--surface) 60%, transparent); }
+.btn-ghost:hover { border-color: var(--accent); }
+.btn small { display: block; font-weight: 500; font-size: 12px; opacity: .8; }
+.hint { font-size: 14px; color: var(--muted); }
+
+/* the live desktop */
+.desk { position: relative; aspect-ratio: 16 / 9; max-width: 100%; border-radius: 18px; overflow: hidden; border: 1px solid var(--line);
+  background: linear-gradient(135deg, #1d3557, #3c2a5e 55%, #5b2a62); box-shadow: 0 40px 80px -40px rgba(0,0,0,.7); }
+.win { position: absolute; border-radius: 10px; overflow: hidden; box-shadow: 0 18px 40px -18px rgba(0,0,0,.6); }
+.win .bar { height: 26px; display: flex; gap: 6px; align-items: center; padding-inline: 10px; }
+.win .bar i { width: 10px; height: 10px; border-radius: 50%; background: rgba(128,128,128,.45); }
+.win.browser { left: 5%; top: 8%; width: 48%; height: 70%; background: var(--win-light); }
+.win.browser .bar { background: #e2e6e3; }
+.win.browser .lines { padding: 16px; display: grid; gap: 10px; }
+.win.browser .lines span { height: 9px; border-radius: 4px; background: #d5dbd7; }
+.win.editor { right: 5%; top: 16%; width: 52%; height: 72%; background: var(--win-dark); font: 500 clamp(8px, 1.05vw, 13px)/1.65 var(--mono); }
+.win.editor .bar { background: #121a18; }
+.win.editor pre { margin: 0; padding: 12px 14px; color: #c9d6d0; white-space: pre; overflow: hidden; }
+.c1 { color: var(--code-1); } .c2 { color: var(--code-2); } .c3 { color: var(--code-3); } .cm { color: #6f8a80; }
+.subs { position: absolute; left: 0; right: 0; bottom: 6%; display: grid; justify-items: center; gap: 4px; padding-inline: 4%; text-align: center; pointer-events: none; }
+.ayah { font-family: var(--quran); direction: rtl; color: var(--gold); font-size: clamp(20px, 3.6vw, 46px); line-height: 1.9;
+  -webkit-text-stroke: .06em rgba(0,0,0,.9); paint-order: stroke fill; text-shadow: 0 2px 14px rgba(0,0,0,.35); transition: opacity .5s, filter .5s, transform .5s; }
+.ayah .w { transition: opacity .35s, filter .35s; }
+.ayah .w.hide { opacity: 0; filter: blur(6px); }
+.trans { font: 500 clamp(10px, 1.35vw, 17px)/1.45 var(--body); color: #fff; max-width: 70ch;
+  -webkit-text-stroke: .25em rgba(0,0,0,.85); paint-order: stroke fill; transition: opacity .5s; }
+.swap { opacity: 0; filter: blur(8px); transform: translateY(6px); }
+.nowbar { position: absolute; left: 3%; top: 3%; display: flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px;
+  background: rgba(8,16,14,.72); color: #e8efe9; font: 500 clamp(10px, 1.1vw, 13px) var(--body); backdrop-filter: blur(6px); }
+.nowbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 var(--accent); animation: pulse 1.6s infinite; }
+.nowbar .prog { width: clamp(50px, 9vw, 120px); height: 4px; border-radius: 2px; background: rgba(255,255,255,.2); overflow: hidden; }
+.nowbar .prog b { display: block; height: 100%; width: 0; background: var(--accent); }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.cursor { position: absolute; width: 18px; height: 18px; left: 62%; top: 55%; transition: left 1.2s ease, top 1.2s ease; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.demo-controls { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; margin-top: 14px; }
+.seg { display: inline-flex; padding: 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); gap: 4px; }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 9px; font: 600 14px var(--body); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.demo-note { font-size: 14px; color: var(--muted); min-height: 1.6em; }
+kbd { font: 500 13px/1 var(--mono); padding: 4px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--surface); color: var(--fg); white-space: nowrap; }
+
+/* ------------------------------------------------ sections */
+section { padding-block: 96px; }
+section > .wrap > header { display: grid; gap: 14px; max-width: 720px; margin-bottom: 48px; }
+section h2 { font-size: clamp(30px, 4.2vw, 50px); font-weight: 700; }
+section header p { color: var(--muted); font-size: 18px; }
+
+.modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.mode { padding: 28px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line); display: grid; gap: 12px; align-content: start; }
+.mode h3 { font-size: 24px; }
+.mode p { color: var(--muted); }
+.mode .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.mode .ic svg { width: 24px; height: 24px; }
+@media (max-width: 900px) { .modes { grid-template-columns: 1fr; } }
+
+.feats { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 20px; }
+.feat { grid-column: span 4; padding: 26px; border-radius: var(--radius); border: 1px solid var(--line); background: linear-gradient(180deg, var(--surface), var(--bg-2)); display: grid; gap: 10px; align-content: start; min-width: 0; }
+.feat.wide { grid-column: span 8; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+.feat h3 { font-size: 21px; }
+.feat p { color: var(--muted); font-size: 16px; }
+.feat .num { font: 800 46px/1 var(--display); color: var(--gold-ink); font-variant-numeric: tabular-nums; }
+.feat img { border-radius: 10px; border: 1px solid var(--line); }
+.feat.keysfeat { grid-column: span 12; }
+.feat .num.glyph { font: 400 44px/1.15 var(--quran); height: 52px; }
+@media (max-width: 960px) { .feat, .feat.wide { grid-column: span 12; } .feat.wide { grid-template-columns: 1fr; } }
+
+.keys { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 26px; margin-top: 6px; }
+.keys div { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding-block: 8px; border-bottom: 1px dashed var(--line); font-size: 15px; }
+.keys span { color: var(--muted); }
+
+/* screenshots */
+.shots { display: grid; grid-auto-flow: column; grid-auto-columns: min(78%, 720px); gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 16px;
+  scrollbar-color: var(--line) transparent; }
+.shots figure { margin: 0; scroll-snap-align: start; display: grid; gap: 10px; }
+.shots img { border-radius: 12px; border: 1px solid var(--line); cursor: zoom-in; }
+.shots figcaption { color: var(--muted); font-size: 15px; }
+.shot-nav { display: flex; gap: 8px; margin-top: 16px; }
+.shot-nav button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; font-size: 18px; }
+.shot-nav button:hover { border-color: var(--accent); }
+dialog.zoom { border: 0; padding: 0; background: transparent; max-width: 96vw; max-height: 92vh; }
+dialog.zoom::backdrop { background: rgba(4,10,8,.86); }
+dialog.zoom img { max-height: 92vh; border-radius: 12px; }
+
+/* downloads */
+.dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.os { padding: 28px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); display: grid; gap: 16px; align-content: start; position: relative; transition: border-color .3s, box-shadow .3s; }
+.os.yours { border-color: var(--accent); box-shadow: 0 0 0 4px var(--glow); }
+.os .tag { position: absolute; top: 16px; inset-inline-end: 16px; font: 600 12px var(--body); color: var(--accent-ink); background: var(--accent); padding: 4px 10px; border-radius: 999px; }
+.os:not(.yours) .tag { display: none; }
+.os h3 { font-size: 26px; display: flex; gap: 12px; align-items: center; }
+.os h3 svg { width: 28px; height: 28px; }
+.os .req { color: var(--muted); font-size: 14px; }
+.os .files { display: grid; gap: 10px; }
+.file { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line); text-decoration: none; transition: border-color .2s, background .2s; }
+.file:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.file b { display: block; font-weight: 600; }
+.file small { color: var(--muted); font-size: 13px; }
+.file.soon { opacity: .6; pointer-events: none; }
+.file svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.os details { font-size: 14px; color: var(--muted); }
+.os details summary { cursor: pointer; color: var(--fg); }
+.os details p { margin-top: 8px; }
+@media (max-width: 960px) { .dl { grid-template-columns: 1fr; } }
+.pipx { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; padding: 18px 20px; border-radius: var(--radius); border: 1px dashed var(--line); }
+.pipx code { font: 500 15px var(--mono); color: var(--gold-ink); overflow-x: auto; min-width: 0; direction: ltr; }
+.copy { border: 1px solid var(--line); background: var(--bg-2); color: var(--fg); padding: 6px 12px; border-radius: 8px; cursor: pointer; font: 600 13px var(--body); }
+
+/* privacy + footer */
+.privacy { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; align-items: center; }
+.privacy ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 14px; }
+.privacy li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; color: var(--muted); }
+.privacy li b { color: var(--fg); font-weight: 600; }
+.privacy li svg { width: 22px; height: 22px; color: var(--accent); margin-top: 3px; }
+.verse-card { padding: 40px 32px; border-radius: 18px; background: radial-gradient(120% 120% at 50% 0%, var(--surface), var(--bg-2)); border: 1px solid var(--line); text-align: center; display: grid; gap: 14px; }
+.verse-card .ar { font: 400 clamp(26px, 3.4vw, 38px)/2 var(--quran); color: var(--gold-ink); direction: rtl; }
+.verse-card .en { color: var(--muted); font-size: 16px; }
+@media (max-width: 860px) { .privacy { grid-template-columns: 1fr; } }
+footer { border-top: 1px solid var(--line); padding-block: 40px; color: var(--muted); font-size: 14px; }
+footer .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; justify-content: space-between; }
+footer a { color: var(--fg); }
+
+/* load-in: visible at rest, gently lifted when motion is allowed */
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+  .rise.d1 { animation-delay: .08s; } .rise.d2 { animation-delay: .16s; } .rise.d3 { animation-delay: .26s; }
+  @keyframes rise { from { transform: translateY(14px); } }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; } .ayah, .trans, .ayah .w, .cursor { transition: none; } .nowbar .dot { animation: none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <a class="brand" href="#top"><img src="logo.png" alt=""><span><span data-t="name">Quran Companion</span><small data-t="name2">رفيق التلاوة</small></span></a>
+    <div class="navlinks">
+      <a href="#modes" data-t="nav_modes">Modes</a>
+      <a href="#features" data-t="nav_features">Features</a>
+      <a href="#screens" data-t="nav_screens">Screenshots</a>
+      <a href="#download" data-t="nav_download">Download</a>
+    </div>
+    <button class="lang" id="lang" type="button" aria-label="Switch language">العربية</button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <canvas id="stars" aria-hidden="true"></canvas>
+  <div class="wrap">
+    <div class="hero-copy">
+      <span class="eyebrow rise" data-t="eyebrow">Free · Windows, macOS and Linux</span>
+      <h1 class="rise d1" data-t="h1" data-html>The Quran, <em>over</em> everything you do.</h1>
+      <p class="lede rise d2" data-t="lede">A reciter plays, and the verse being recited appears over your windows like subtitles, with its translation. Clicks pass straight through it, so you keep working underneath.</p>
+      <div class="cta rise d3">
+        <a class="btn btn-primary" id="hero-dl" href="#download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-5-5m5 5 5-5M4 21h16"/></svg>
+          <span><span id="hero-dl-label" data-t="dl_generic">Download</span><small id="hero-dl-sub" data-t="dl_free">Free, no account</small></span>
+        </a>
+        <a class="btn btn-ghost" href="#download" data-t="other_os">Other systems</a>
+      </div>
+    </div>
+
+    <div class="rise d3">
+      <div class="desk" id="desk" aria-label="Demo: verses shown over a browser and a code editor">
+        <div class="win browser"><div class="bar"><i></i><i></i><i></i></div>
+          <div class="lines"><span style="width:62%"></span><span style="width:88%"></span><span style="width:74%"></span><span style="width:40%"></span><span style="width:81%"></span><span style="width:66%"></span></div>
+        </div>
+        <div class="win editor"><div class="bar"><i></i><i></i><i></i></div>
+<pre><span class="cm"># while you work, the verses stay in view</span>
+<span class="c3">def</span> <span class="c1">study</span>(topic):
+    notes = []
+    <span class="c3">for</span> page <span class="c3">in</span> topic.pages:
+        notes.append(summarize(page))
+    <span class="c3">return</span> <span class="c2">"\n"</span>.join(notes)
+
+<span class="c3">class</span> <span class="c1">Session</span>:
+    hours: <span class="c3">int</span> = <span class="c2">2</span>
+    breaks: <span class="c3">bool</span> = <span class="c3">True</span></pre>
+        </div>
+        <div class="nowbar"><span class="dot"></span><span id="now">Ash-Sharh · 5</span><span class="prog"><b id="prog"></b></span></div>
+        <svg class="cursor" id="cursor" viewBox="0 0 24 24"><path d="M4 2l15 9-7 1.5L8.5 20z" fill="#fff" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        <div class="subs" aria-live="polite">
+          <div class="ayah" id="ayah"></div>
+          <div class="trans" id="trans"></div>
+        </div>
+      </div>
+      <div class="demo-controls">
+        <div class="seg" role="group" aria-label="Demo mode">
+          <button type="button" data-mode="recite" aria-pressed="true" data-t="m_recite">With reciter</button>
+          <button type="button" data-mode="memorize" aria-pressed="false" data-t="m_memorize">Memorize</button>
+          <button type="button" data-mode="manual" aria-pressed="false" data-t="m_manual">Manual</button>
+        </div>
+        <p class="demo-note" id="demo-note"></p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="modes">
+  <div class="wrap">
+    <header>
+      <span class="eyebrow" data-t="modes_eyebrow">Three ways to use it</span>
+      <h2 data-t="modes_h">Listen, memorize, or follow along</h2>
+    </header>
+    <div class="modes">
+      <article class="mode">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12v-1a9 9 0 0 1 18 0v1"/><rect x="3" y="12" width="4" height="8" rx="1.5"/><rect x="17" y="12" width="4" height="8" rx="1.5"/></svg></div>
+        <h3 data-t="m_recite">With reciter</h3>
+        <p data-t="m_recite_p">Pick one of 115 reciters. Each verse appears as it is recited, and long verses turn their page on the exact word for reciters that have word timings.</p>
+      </article>
+      <article class="mode">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2"/><path d="M9 8h7M9 12h5"/></svg></div>
+        <h3 data-t="m_memorize">Memorize</h3>
+        <p data-t="m_memorize_p">Silent, at your pace: by verse length, a fixed time, or a reciter's real timing. Show the first words as a hint, or show the verse and then hide it so you recite from memory.</p>
+      </article>
+      <article class="mode">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8"/></svg></div>
+        <h3 data-t="m_manual">Manual</h3>
+        <p data-t="m_manual_p">The text moves only when you press a key. Handy in a lesson, or while a recitation plays somewhere else.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="features" style="background: var(--bg-2)">
+  <div class="wrap">
+    <header>
+      <span class="eyebrow" data-t="feat_eyebrow">Made for long hours</span>
+      <h2 data-t="feat_h">Stays out of your way, all day</h2>
+      <p data-t="feat_p">The verses never take focus and never block a click. Everything is set once in a calm settings window, in Arabic or English.</p>
+    </header>
+    <div class="feats">
+      <article class="feat wide">
+        <div style="display:grid;gap:10px">
+          <h3 data-t="f_link_h">Any recitation you love</h3>
+          <p data-t="f_link_p">Paste a YouTube or MP3 link, or choose a file. The app matches the recording against reciters with known timings and finds where each verse starts. A recording that is a published one comes out almost exact. If a verse is late, press one key the moment it starts and the rest re-aligns.</p>
+        </div>
+        <img src="screenshots/link.png" alt="Link or file panel with synced recordings" loading="lazy">
+      </article>
+      <article class="feat">
+        <span class="num">115</span>
+        <h3 data-t="f_rec_h">Reciters with verse timings</h3>
+        <p data-t="f_rec_p">From mp3quran.net, searchable in Arabic and English. Download any of them for offline use.</p>
+      </article>
+      <article class="feat">
+        <span class="num">⇢</span>
+        <h3 data-t="f_browser_h">Follows a browser video</h3>
+        <p data-t="f_browser_p">On Linux, sync a recitation video once and the verses follow it in Firefox or Chrome, through pauses, skips and ads.</p>
+      </article>
+      <article class="feat">
+        <span class="num glyph">ع</span>
+        <h3 data-t="f_look_h">Your text, your way</h3>
+        <p data-t="f_look_p">Quran font and size, outline or background box, top or bottom, how many lines. Long verses split into pages; text never shrinks.</p>
+      </article>
+      <article class="feat">
+        <span class="num">60+</span>
+        <h3 data-t="f_tr_h">Translations</h3>
+        <p data-t="f_tr_p">Any translation from alquran.cloud, set under the Arabic in a smaller size, in its own font.</p>
+      </article>
+      <article class="feat keysfeat">
+        <h3 data-t="f_keys_h">Shortcuts everywhere</h3>
+        <p><span data-t="f_keys_p">Hold</span> <kbd class="mod">Super+Alt</kbd>:</p>
+        <div class="keys">
+          <div><kbd>Q</kbd><span data-t="k_q">start / stop</span></div>
+          <div><kbd>← →</kbd><span data-t="k_lr">previous / next verse</span></div>
+          <div><kbd>Space</kbd><span data-t="k_sp">pause</span></div>
+          <div><kbd>H</kbd><span data-t="k_h">hide the verses</span></div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <header>
+      <span class="eyebrow" data-t="shots_eyebrow">Screenshots</span>
+      <h2 data-t="shots_h">A settings window you'll enjoy opening</h2>
+    </header>
+    <div class="shots" id="shots">
+      <figure><img src="screenshots/recite.png" alt="" loading="lazy"><figcaption data-t="s1">Choose a surah, a mode and a reciter</figcaption></figure>
+      <figure><img src="screenshots/recite-ar.png" alt="" loading="lazy"><figcaption data-t="s2">Fully right-to-left in Arabic, light or dark</figcaption></figure>
+      <figure><img src="screenshots/appearance.png" alt="" loading="lazy"><figcaption data-t="s3">Live preview of every style change</figcaption></figure>
+      <figure><img src="screenshots/browser.png" alt="" loading="lazy"><figcaption data-t="s4">Follow a video playing in your browser (Linux)</figcaption></figure>
+      <figure><img src="screenshots/downloads.png" alt="" loading="lazy"><figcaption data-t="s5">Download reciters for offline listening</figcaption></figure>
+      <figure><img src="screenshots/overlay-box.png" alt="" loading="lazy"><figcaption data-t="s6">Background box, gold text, top of the screen</figcaption></figure>
+    </div>
+    <div class="shot-nav"><button type="button" id="prev" aria-label="Previous screenshot">‹</button><button type="button" id="next" aria-label="Next screenshot">›</button></div>
+  </div>
+</section>
+
+<section id="download" style="background: var(--bg-2)">
+  <div class="wrap">
+    <header>
+      <span class="eyebrow" data-t="dl_eyebrow">Download</span>
+      <h2 data-t="dl_h">Free for every computer</h2>
+      <p data-t="dl_p">No account, no ads. The Quran text, recitations and translations download as you use them, and can be saved for offline use.</p>
+    </header>
+    <div class="dl">
+      <article class="os" data-os="windows">
+        <span class="tag" data-t="yours">Your system</span>
+        <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5 10.5 4.4v7.1H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7.1L3 18.5zm8.5 0H21V21l-9.5-1.3z"/></svg>Windows</h3>
+        <p class="req" data-t="win_req">Windows 10 or 11, 64-bit</p>
+        <div class="files">
+          <a class="file" data-file="QuranCompanion-windows-x64-setup.exe" href="#"><span><b data-t="win_setup">Installer</b><small>.exe</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <a class="file" data-file="QuranCompanion-windows-x64-portable.zip" href="#"><span><b data-t="win_zip">Portable</b><small data-t="win_zip_s">.zip, runs without installing</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <div class="file soon"><span><b>winget</b><small data-t="soon">coming soon</small></span></div>
+        </div>
+        <details><summary data-t="first_run">First start</summary><p data-t="win_first">If Windows shows "Windows protected your PC", choose More info, then Run anyway. Shortcuts use Win+Alt.</p></details>
+      </article>
+      <article class="os" data-os="mac">
+        <span class="tag" data-t="yours">Your system</span>
+        <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9-.1 0-2.7-1-2.7-4.1zM13.9 4.9c.7-.9 1.2-2 1-3.2-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.1 1.2.1 2.3-.6 3.1-1.5z"/></svg>macOS</h3>
+        <p class="req" data-t="mac_req">macOS 11 Big Sur or later</p>
+        <div class="files">
+          <a class="file" data-file="QuranCompanion-macos-arm64.dmg" href="#"><span><b>Apple Silicon</b><small data-t="mac_arm">M1 and later · .dmg</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <a class="file" data-file="QuranCompanion-macos-x86_64.dmg" href="#"><span><b>Intel</b><small>.dmg</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <div class="file soon"><span><b>Homebrew</b><small data-t="soon">coming soon</small></span></div>
+        </div>
+        <details><summary data-t="first_run">First start</summary><p data-t="mac_first">Drag the app into Applications. Shortcuts use Ctrl+Option; macOS asks once for the Accessibility permission they need.</p></details>
+      </article>
+      <article class="os" data-os="linux">
+        <span class="tag" data-t="yours">Your system</span>
+        <h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-2.2 0-3.6 1.9-3.6 4.6 0 1.3.3 2.3-.5 3.6C6.6 12 5 14.2 5 16.6c0 .8.2 1.4.5 1.9-.8.4-1.6 1-1.6 1.8 0 1.2 2 1.4 3.6 1.6 1 .1 1.8.5 2.5.5.9 0 1.4-.4 2-.4s1.1.4 2 .4c.7 0 1.5-.4 2.5-.5 1.6-.2 3.6-.4 3.6-1.6 0-.8-.8-1.4-1.6-1.8.3-.5.5-1.1.5-1.9 0-2.4-1.6-4.6-2.9-6.4-.8-1.3-.5-2.3-.5-3.6C15.6 3.9 14.2 2 12 2zm-1.4 4.2c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zm2.8 0c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zM12 9c.9 0 2 .5 2 .9s-1.1 1-2 1-2-.6-2-1 1.1-.9 2-.9z"/></svg>Linux</h3>
+        <p class="req" data-t="lin_req">Any distribution, x86_64 · best on GNOME</p>
+        <div class="files">
+          <div class="file soon"><span><b>Flathub</b><small data-t="soon">coming soon</small></span></div>
+          <a class="file" data-file="QuranCompanion-linux-x86_64.AppImage" href="#"><span><b>AppImage</b><small data-t="lin_app">one file, make it executable and run</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+          <a class="file" data-file="QuranCompanion-linux-x86_64.tar.gz" href="#"><span><b data-t="lin_tar">Archive</b><small>.tar.gz</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg></a>
+        </div>
+        <details><summary data-t="first_run">First start</summary><p data-t="lin_first">Run "QuranCompanion setup-shortcuts" once to add the Super+Alt shortcuts to GNOME, and "install-desktop" for the app menu.</p></details>
+      </article>
+    </div>
+    <div class="pipx">
+      <span data-t="pipx">With Python on any system:</span>
+      <code id="pipcmd">pipx install "quran-companion[media]"</code>
+      <button class="copy" type="button" id="copy" data-t="copy">Copy</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap privacy">
+    <div style="display:grid;gap:22px">
+      <span class="eyebrow" data-t="priv_eyebrow">Private by design</span>
+      <h2 data-t="priv_h">Nothing about you leaves your computer</h2>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 4 6v6c0 4.5 3.4 8.2 8 9 4.6-.8 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg><span data-t="pv1" data-html><b>No account and no tracking.</b> Settings and recordings stay in your user folder.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 5 6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7"/></svg><span data-t="pv2" data-html><b>Listening stays in memory.</b> To follow a browser video, the app briefly compares your speakers' sound with the recitation. It never uses the microphone, and records or sends nothing.</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span data-t="pv3" data-html><b>Open sources.</b> Text and translations from alquran.cloud, recitations and timings from mp3quran.net, word timings from quran.com.</span></li>
+      </ul>
+    </div>
+    <div class="verse-card">
+      <div class="ar">ٱلَّذِينَ ءَامَنُوا۟ وَتَطْمَئِنُّ قُلُوبُهُم بِذِكْرِ ٱللَّهِ ۗ أَلَا بِذِكْرِ ٱللَّهِ تَطْمَئِنُّ ٱلْقُلُوبُ</div>
+      <div class="en" data-t="vc_en">Those who have believed and whose hearts are assured by the remembrance of Allah. Unquestionably, by the remembrance of Allah hearts are assured.</div>
+      <div class="hint" data-t="vc_ref">Ar-Ra'd · 28</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span data-t="foot">Quran Companion · رفيق التلاوة. Free and open source.</span>
+    <span><a id="gh" href="https://github.com/YakoubBenaisa/quran-subs">GitHub</a> · <a id="rel" href="https://github.com/YakoubBenaisa/quran-subs/releases">Releases</a> · <a id="issues" href="https://github.com/YakoubBenaisa/quran-subs/issues" data-t="report">Report a problem</a></span>
+  </div>
+</footer>
+
+<dialog class="zoom" id="zoom"><img alt="" id="zoomimg"></dialog>
+
+<script>
+(() => {
+  const REPO = "YakoubBenaisa/quran-subs";
+  const LATEST = `https://github.com/${REPO}/releases/latest/download/`;
+  const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------------------------------------------------------------- system detection
+  const ua = navigator.userAgent, plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  const os = /Win/i.test(plat) || /Windows/.test(ua) ? "windows" : /Mac/i.test(plat) || /Mac OS X/.test(ua) ? (/iPhone|iPad/.test(ua) ? "" : "mac") : /Linux|X11/i.test(plat + ua) && !/Android/.test(ua) ? "linux" : "";
+  const MOD = { windows: "Win+Alt", mac: "Ctrl+Option", linux: "Super+Alt" }[os] || "Super+Alt";
+  document.querySelectorAll("a.file[data-file]").forEach(a => { a.href = LATEST + a.dataset.file; });
+  const card = os && document.querySelector(`.os[data-os="${os}"]`);
+  if (card) card.classList.add("yours");
+
+  // ---------------------------------------------------------------- languages
+  const AR = {
+    name: "رفيق التلاوة", name2: "Quran Companion", nav_modes: "طرق العرض", nav_features: "المزايا", nav_screens: "لقطات", nav_download: "التنزيل",
+    eyebrow: "مجاني · ويندوز وماك ولينكس", h1: "القرآن الكريم <em>فوق</em> كل ما تعمل.",
+    lede: "يتلو القارئ فتظهر الآية المتلوّة فوق نوافذك كالترجمة المرئية، ومعها معانيها. تمرّ النقرات من خلالها، فتواصل عملك تحتها دون انقطاع.",
+    dl_generic: "تنزيل", dl_free: "مجاني، دون حساب", other_os: "أنظمة أخرى",
+    m_recite: "مع القارئ", m_memorize: "للحفظ", m_manual: "يدوي",
+    modes_eyebrow: "ثلاث طرق للاستخدام", modes_h: "استمع، أو احفظ، أو تابع",
+    m_recite_p: "اختر أحد ١١٥ قارئًا. تظهر كل آية حين تُتلى، وتنتقل صفحات الآيات الطويلة عند الكلمة نفسها للقرّاء الذين لهم توقيتات الكلمات.",
+    m_memorize_p: "بصمت وعلى مهلك: بحسب طول الآية، أو وقت ثابت، أو توقيت قارئ حقيقي. اعرض أوائل الكلمات تلميحًا، أو اعرض الآية ثم أخفها لتسمّعها من حفظك.",
+    m_manual_p: "لا يتحرك النص إلا حين تضغط مفتاحًا. مفيد في الدرس، أو حين تُتلى التلاوة في مكان آخر.",
+    feat_eyebrow: "لساعات العمل الطويلة", feat_h: "لا يعترض طريقك طوال اليوم",
+    feat_p: "لا تأخذ الآيات تركيز لوحة المفاتيح ولا تحجب نقرة. وكل شيء يُضبط مرة واحدة في نافذة إعدادات هادئة بالعربية أو الإنجليزية.",
+    f_link_h: "أي تلاوة تحبها", f_link_p: "الصق رابط يوتيوب أو MP3، أو اختر ملفًا. يطابق التطبيق التسجيل مع قرّاء معروفة توقيتاتهم ويجد بداية كل آية. وإن كان التسجيل منشورًا من قبل خرج شبه مطابق. وإن تأخرت آية، فاضغط مفتاحًا لحظة بدئها فيُعاد ضبط ما بعدها.",
+    f_rec_h: "قارئًا بتوقيتات الآيات", f_rec_p: "من mp3quran.net، مع بحث بالعربية والإنجليزية. ويمكنك تنزيل أي قارئ للاستماع دون اتصال.",
+    f_browser_h: "يتبع مقطعًا في المتصفح", f_browser_p: "على لينكس: طابق مقطع التلاوة مرة واحدة، ثم تتبعه الآيات في فايرفوكس أو كروم، مع الإيقاف والتقديم والإعلانات.",
+    f_look_h: "نصّك كما تحب", f_look_p: "خط المصحف وحجمه، حدّ حول النص أو خلفية، أعلى الشاشة أو أسفلها، وعدد الأسطر. تُقسَّم الآيات الطويلة صفحات، ولا يصغر النص أبدًا.",
+    f_tr_h: "ترجمة للمعاني", f_tr_p: "أي ترجمة من alquran.cloud، تحت النص العربي بحجم أصغر وبخطها الخاص.",
+    f_keys_h: "اختصارات في كل مكان", f_keys_p: "اضغط مع", k_q: "بدء / إيقاف", k_lr: "الآية السابقة / التالية", k_sp: "إيقاف مؤقت", k_h: "إخفاء الآيات",
+    shots_eyebrow: "لقطات", shots_h: "نافذة إعدادات يسرّك فتحها",
+    s1: "اختر السورة وطريقة العرض والقارئ", s2: "من اليمين إلى اليسار بالكامل، فاتح أو داكن", s3: "معاينة حيّة لكل تغيير في المظهر",
+    s4: "تتبّع مقطعًا يعمل في متصفحك (لينكس)", s5: "نزّل القرّاء للاستماع دون اتصال", s6: "خلفية خلف النص، ونص ذهبي أعلى الشاشة",
+    dl_eyebrow: "التنزيل", dl_h: "مجاني لكل حاسوب", dl_p: "دون حساب ولا إعلانات. يُنزَّل نص القرآن والتلاوات والتراجم عند استخدامها، ويمكن حفظها للاستماع دون اتصال.",
+    yours: "نظامك", win_req: "ويندوز ١٠ أو ١١، ٦٤ بت", win_setup: "المثبِّت", win_zip: "نسخة محمولة", win_zip_s: "‎.zip تعمل دون تثبيت", soon: "قريبًا",
+    first_run: "أول تشغيل", win_first: "إن ظهرت رسالة «Windows protected your PC» فاختر More info ثم Run anyway. الاختصارات: Win+Alt.",
+    mac_req: "ماك أو إس ١١ أو أحدث", mac_arm: "M1 وما بعده · ‎.dmg", mac_first: "اسحب التطبيق إلى مجلد التطبيقات. الاختصارات: Ctrl+Option، ويطلب النظام مرة واحدة إذن تسهيلات الاستخدام اللازم لها.",
+    lin_req: "أي توزيعة، x86_64 · الأفضل مع جنوم", lin_app: "ملف واحد: اجعله قابلًا للتنفيذ وشغّله", lin_tar: "أرشيف",
+    lin_first: "شغّل «QuranCompanion setup-shortcuts» مرة لإضافة اختصارات Super+Alt إلى جنوم، و«install-desktop» لإضافته إلى قائمة التطبيقات.",
+    pipx: "مع بايثون على أي نظام:", copy: "نسخ", copied: "تم النسخ",
+    priv_eyebrow: "الخصوصية أولًا", priv_h: "لا يغادر حاسوبك شيء عنك",
+    pv1: "<b>دون حساب ولا تتبّع.</b> تبقى الإعدادات والتسجيلات في مجلد المستخدم.",
+    pv2: "<b>الاستماع يبقى في الذاكرة.</b> لتتبّع مقطع في المتصفح يقارن التطبيق صوت السماعات بالتلاوة لحظات قليلة، دون الميكروفون، ولا يسجّل شيئًا ولا يرسله.",
+    pv3: "<b>مصادر مفتوحة.</b> النص والتراجم من alquran.cloud، والتلاوات والتوقيتات من mp3quran.net، وتوقيتات الكلمات من quran.com.",
+    vc_en: "الرعد · ٢٨", vc_ref: "", foot: "رفيق التلاوة · Quran Companion. مجاني ومفتوح المصدر.", report: "الإبلاغ عن مشكلة",
+    dl_for: { windows: "تنزيل لويندوز", mac: "تنزيل لماك", linux: "تنزيل للينكس" },
+    notes: { recite: "يتقدّم النص مع التلاوة، آيةً بعد آية.", memorize: "تظهر أوائل الكلمات، ثم تكتمل الآية.", manual: "انقر على سطح المكتب أو اضغط ← لعرض الآية التالية." },
+  };
+  const EN = {};
+  document.querySelectorAll("[data-t]").forEach(el => { EN[el.dataset.t] = el.hasAttribute("data-html") ? el.innerHTML : el.textContent; });
+  EN.copied = "Copied";
+  EN.dl_for = { windows: "Download for Windows", mac: "Download for macOS", linux: "Download for Linux" };
+  EN.notes = { recite: "The text moves with the recitation, verse by verse.", memorize: "First words as a hint, then the whole verse.", manual: "Click the desktop or press → for the next verse." };
+  EN.dl_sub = { windows: "Installer · 64-bit", mac: "Apple Silicon · .dmg", linux: "AppImage · x86_64" };
+  AR.dl_sub = { windows: "المثبِّت · ٦٤ بت", mac: "Apple Silicon · ‎.dmg", linux: "AppImage · x86_64" };
+  const HERO_FILE = { windows: "QuranCompanion-windows-x64-setup.exe", mac: "QuranCompanion-macos-arm64.dmg", linux: "QuranCompanion-linux-x86_64.AppImage" };
+
+  let lang = store.get("lang") || ((navigator.language || "").startsWith("ar") ? "ar" : "en");
+  function apply() {
+    const L = lang === "ar" ? AR : EN;
+    document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+    document.querySelectorAll("[data-t]").forEach(el => {
+      const v = L[el.dataset.t]; if (v === undefined || typeof v !== "string") return;
+      if (el.hasAttribute("data-html")) el.innerHTML = v; else el.textContent = v;
+    });
+    document.querySelectorAll("kbd.mod").forEach(k => { k.textContent = MOD; });
+    document.getElementById("lang").textContent = lang === "ar" ? "English" : "العربية";
+    if (os) {
+      document.getElementById("hero-dl-label").textContent = L.dl_for[os];
+      document.getElementById("hero-dl-sub").textContent = L.dl_sub[os];
+      document.getElementById("hero-dl").href = LATEST + HERO_FILE[os];
+    }
+    note();
+    show(true);
+  }
+  document.getElementById("lang").addEventListener("click", () => { lang = lang === "ar" ? "en" : "ar"; store.set("lang", lang); apply(); });
+
+  // ---------------------------------------------------------------- the demo
+  const V = [
+    { s: "Ash-Sharh", sa: "الشرح", a: 5, ar: "فَإِنَّ مَعَ ٱلْعُسْرِ يُسْرًا ﴿٥﴾", en: "For indeed, with hardship [will be] ease." },
+    { s: "Ash-Sharh", sa: "الشرح", a: 6, ar: "إِنَّ مَعَ ٱلْعُسْرِ يُسْرًۭا ﴿٦﴾", en: "Indeed, with hardship [will be] ease." },
+    { s: "Taa-Haa", sa: "طه", a: 114, ar: "وَقُل رَّبِّ زِدْنِى عِلْمًۭا", en: "And say, \"My Lord, increase me in knowledge.\"" },
+    { s: "Ar-Ra'd", sa: "الرعد", a: 28, ar: "أَلَا بِذِكْرِ ٱللَّهِ تَطْمَئِنُّ ٱلْقُلُوبُ ﴿٢٨﴾", en: "Unquestionably, by the remembrance of Allah hearts are assured." },
+    { s: "Al-Kahf", sa: "الكهف", a: 10, ar: "رَبَّنَآ ءَاتِنَا مِن لَّدُنكَ رَحْمَةًۭ وَهَيِّئْ لَنَا مِنْ أَمْرِنَا رَشَدًۭا ﴿١٠﴾", en: "\"Our Lord, grant us from Yourself mercy and prepare for us from our affair right guidance.\"" },
+  ];
+  const ayahEl = document.getElementById("ayah"), trEl = document.getElementById("trans"), nowEl = document.getElementById("now"), progEl = document.getElementById("prog");
+  let mode = "recite", i = 0, timer = 0, t0 = 0, dur = 6000, raf = 0;
+  const digits = n => lang === "ar" ? String(n).replace(/\d/g, d => "٠١٢٣٤٥٦٧٨٩"[d]) : String(n);
+  function note() { document.getElementById("demo-note").textContent = (lang === "ar" ? AR : EN).notes[mode]; }
+  function render(v) {
+    ayahEl.innerHTML = v.ar.split(" ").map(w => `<span class="w">${w}</span>`).join(" ");
+    trEl.textContent = lang === "ar" ? "" : v.en;
+    nowEl.textContent = `${lang === "ar" ? v.sa : v.s} · ${digits(v.a)}`;
+  }
+  function show(now) {
+    const v = V[i];
+    clearTimeout(timer);
+    const go = () => {
+      render(v);
+      ayahEl.classList.remove("swap"); trEl.classList.remove("swap");
+      if (mode === "memorize") memorize(); else if (mode === "recite") schedule(dur);
+    };
+    if (now || reduce) { go(); return; }
+    ayahEl.classList.add("swap"); trEl.classList.add("swap");
+    timer = setTimeout(go, 500);
+  }
+  function schedule(ms) {
+    t0 = performance.now(); dur = ms;
+    cancelAnimationFrame(raf);
+    const step = () => { const f = Math.min(1, (performance.now() - t0) / dur); progEl.style.width = (f * 100) + "%"; if (f < 1) raf = requestAnimationFrame(step); };
+    step();
+    timer = setTimeout(next, ms);
+  }
+  function memorize() {
+    const ws = [...ayahEl.querySelectorAll(".w")];
+    ws.forEach((w, k) => w.classList.toggle("hide", k >= 2));
+    trEl.style.opacity = 0;
+    progEl.style.width = "0%";
+    timer = setTimeout(() => { ws.forEach(w => w.classList.remove("hide")); trEl.style.opacity = ""; schedule(4200); }, 2200);
+  }
+  function next() { i = (i + 1) % V.length; show(false); }
+  document.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    cancelAnimationFrame(raf); clearTimeout(timer); trEl.style.opacity = ""; progEl.style.width = mode === "manual" ? "0%" : progEl.style.width;
+    note(); show(true);
+  }));
+  const desk = document.getElementById("desk");
+  desk.addEventListener("click", () => { if (mode === "manual") next(); });
+  addEventListener("keydown", e => {
+    if (mode !== "manual") return;
+    const fwd = document.documentElement.dir === "rtl" ? "ArrowLeft" : "ArrowRight";
+    if (e.key === fwd) { e.preventDefault(); next(); }
+  });
+  // the pointer drifts between the windows: you keep working, the verses stay put
+  const cur = document.getElementById("cursor"), spots = [[62, 55], [30, 40], [72, 30], [18, 62], [55, 70]];
+  let sp = 0;
+  if (!reduce) setInterval(() => { sp = (sp + 1) % spots.length; cur.style.left = spots[sp][0] + "%"; cur.style.top = spots[sp][1] + "%"; }, 2600);
+
+  // ---------------------------------------------------------------- screenshots
+  const shots = document.getElementById("shots");
+  const by = d => shots.scrollBy({ left: d * shots.clientWidth * 0.8 * (document.documentElement.dir === "rtl" ? -1 : 1), behavior: reduce ? "auto" : "smooth" });
+  document.getElementById("prev").addEventListener("click", () => by(-1));
+  document.getElementById("next").addEventListener("click", () => by(1));
+  const zoom = document.getElementById("zoom"), zimg = document.getElementById("zoomimg");
+  shots.querySelectorAll("img").forEach(im => im.addEventListener("click", () => { zimg.src = im.src; if (zoom.showModal) zoom.showModal(); }));
+  zoom.addEventListener("click", () => zoom.close());
+
+  // ---------------------------------------------------------------- copy
+  document.getElementById("copy").addEventListener("click", async e => {
+    const btn = e.currentTarget, txt = document.getElementById("pipcmd").textContent;
+    const L = () => (lang === "ar" ? AR : EN);
+    try { await navigator.clipboard.writeText(txt); btn.textContent = L().copied; setTimeout(() => { btn.textContent = L().copy; }, 1500); }
+    catch { const r = document.createRange(); r.selectNodeContents(document.getElementById("pipcmd")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  });
+
+  // ---------------------------------------------------------------- eight-point stars behind the hero
+  const cv = document.getElementById("stars"), cx = cv.getContext("2d");
+  function stars() {
+    const r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = r.width * dpr; cv.height = r.height * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.clearRect(0, 0, r.width, r.height);
+    const css = getComputedStyle(document.documentElement), col = css.getPropertyValue("--line").trim();
+    cx.strokeStyle = col; cx.lineWidth = 1;
+    const S = 64;
+    for (let y = -S; y < r.height + S; y += S) for (let x = -S; x < r.width + S; x += S) {
+      const ox = x + ((y / S) % 2 ? S / 2 : 0), oy = y, k = S * 0.34;
+      cx.beginPath();
+      for (let n = 0; n < 16; n++) { const ang = n * Math.PI / 8, rad = n % 2 ? k * 0.62 : k; cx.lineTo(ox + Math.cos(ang) * rad, oy + Math.sin(ang) * rad); }
+      cx.closePath(); cx.stroke();
+    }
+    cx.globalCompositeOperation = "destination-in";
+    const g = cx.createLinearGradient(0, 0, 0, r.height); g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(.75, "rgba(0,0,0,0)");
+    cx.fillStyle = g; cx.fillRect(0, 0, r.width, r.height); cx.globalCompositeOperation = "source-over";
+  }
+  addEventListener("resize", stars); matchMedia("(prefers-color-scheme: dark)").addEventListener("change", stars);
+  new MutationObserver(stars).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  apply(); stars();
+})();
+</script>
+</body>
+</html>

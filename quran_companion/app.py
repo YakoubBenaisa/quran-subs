@@ -3,7 +3,7 @@ import os
 import signal
 import sys
 
-from . import paths
+from . import paths, system
 from .core.settings import SettingsStore
 from .ipc.client import OverlayClient
 from .ipc.protocol import parse_cli
@@ -51,7 +51,8 @@ def make_corrector(repo):
 
 
 def make_player(repo, st):
-    """ffplay for audio, or following a browser video for the user's own recordings."""
+    """Audio (ffplay if installed, else Qt Multimedia), or following a browser video for the user's own
+    recordings (Linux). QOV_PLAYER=qt|ffplay chooses."""
     from .playback.browser_player import BrowserPlayer
     from .playback.player import FfplayPlayer, RoutingPlayer
     service = None
@@ -60,7 +61,12 @@ def make_player(repo, st):
         nonlocal service
         if service is None: service = make_sync_service(repo)
         return service.features_for_audio(audio)
-    return RoutingPlayer(FfplayPlayer(), BrowserPlayer(), st.load, features_for)
+    choice = os.environ.get("QOV_PLAYER") or ("ffplay" if system.LINUX and system.tool("ffplay") else "qt")
+    if choice == "ffplay": own = FfplayPlayer(system.tool("ffplay") or "ffplay")
+    else:
+        from .overlay.qt_player import QtPlayer
+        own = QtPlayer()
+    return RoutingPlayer(own, BrowserPlayer(), st.load, features_for)
 
 
 def run_overlay(args) -> int:
@@ -78,7 +84,8 @@ def run_overlay(args) -> int:
     if OverlayClient().running():
         print("Already running. Use: quran-overlay.sh quit"); return 0
 
-    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")   # XWayland: always-on-top + click-through on GNOME
+    if system.LINUX:
+        os.environ.setdefault("QT_QPA_PLATFORM", "xcb")   # XWayland: always-on-top + click-through on GNOME
     from PySide6.QtWidgets import QApplication
 
     from .data.repository import default_repository
@@ -106,9 +113,20 @@ Categories=Education;AudioVideo;
 """
 
 
+def launcher_command() -> str:
+    """How the desktop should start this app: the AppImage, the packaged binary or the source launcher."""
+    if os.environ.get("APPIMAGE"): return os.environ["APPIMAGE"]
+    src = os.path.join(os.path.dirname(paths.PKG), "quran-overlay.sh")
+    if not system.FROZEN and os.path.exists(src): return src
+    return " ".join(f'"{a}"' if " " in a else a for a in system.self_command())
+
+
 def install_desktop_entry() -> int:
-    """Write the app-menu entry (~/.local/share/applications/quran-subs.desktop)."""
-    launcher = os.path.join(os.path.dirname(paths.PKG), "quran-overlay.sh")
+    """Write the app-menu entry (~/.local/share/applications/quran-subs.desktop). Linux only:
+    the Windows installer and the macOS app bundle add themselves to the menu."""
+    if not system.LINUX:
+        print("Not needed on this system: the installer adds Quran Companion to the menu."); return 0
+    launcher = launcher_command()
     path = os.path.expanduser("~/.local/share/applications/quran-subs.desktop")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
@@ -158,3 +176,33 @@ def run_ui() -> int:
     code = app.exec()
     bg.shutdown()
     return code
+
+
+SHORTCUTS = [("on/off", "toggle", "q"), ("next", "next", "Right"), ("prev", "prev", "Left"), ("pause", "pause", "space"),
+             ("hide", "hide", "h"), ("bigger", "bigger", "Up"), ("smaller", "smaller", "Down"),
+             ("next surah", "nextsurah", "Page_Down"), ("previous surah", "prevsurah", "Page_Up"), ("settings", "ui", "s")]
+
+
+def setup_shortcuts() -> int:
+    """GNOME: add the Super+Alt shortcuts as custom keyboard shortcuts (keeps the user's own).
+    Windows and macOS: the overlay listens for them itself."""
+    import ast
+    import subprocess
+    if not system.LINUX:
+        print(f"Shortcuts ({system.MOD_LABEL}+key) work while the verses are on screen; nothing to set up."); return 0
+    schema = "org.gnome.settings-daemon.plugins.media-keys"
+    base = "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings"
+    try:
+        cur = subprocess.run(["gsettings", "get", schema, "custom-keybindings"], capture_output=True, text=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        print("gsettings not found: add the shortcuts in your desktop's keyboard settings instead."); return 1
+    cur = cur.strip().removeprefix("@as ")
+    have = list(ast.literal_eval(cur)) if cur.startswith("[") else []
+    exe = launcher_command()
+    for i, (name, cmd, key) in enumerate(SHORTCUTS):
+        p = f"{base}/quran{i}/"; k = f"{schema}.custom-keybinding:{p}"
+        for field, val in (("name", f"Quran: {name}"), ("command", f"{exe} {cmd}"), ("binding", f"<Super><Alt>{key}")):
+            subprocess.run(["gsettings", "set", k, field, val], check=False)
+        if p not in have: have.append(p)
+    subprocess.run(["gsettings", "set", schema, "custom-keybindings", str(have)], check=False)
+    print("Shortcuts added. Super+Alt+S = settings, Super+Alt+Q = start/stop."); return 0

@@ -4,6 +4,7 @@ import locale
 import os
 
 from .. import paths
+from ..system import MOD_LABEL
 
 
 class Translator:
@@ -45,6 +46,7 @@ class Translator:
 
     def t(self, key: str, **kw) -> str:
         s = self._cur.get(key) or self._en.get(key) or key
+        if MOD_LABEL != "Super+Alt": s = s.replace("Super+Alt", MOD_LABEL)     # shortcut keys of this system
         try:
             return s.format(**kw) if kw else s
         except (KeyError, IndexError, ValueError):

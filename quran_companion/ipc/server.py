@@ -1,34 +1,28 @@
-"""Unix-socket command server run by the overlay process."""
+"""Command server run by the overlay process (Unix socket, or local TCP on Windows: see transport)."""
 import json
 import os
-import socket
 import threading
 from typing import Callable
 
 from .protocol import PROTOCOL_VERSION, Cmd, Command, decode
+from .transport import Listener
 
 
 class CommandServer:
     def __init__(self, path: str, on_command: Callable[[Command], None]):
         """`on_command` is called from the server thread; the caller marshals it to its UI thread."""
         self.path, self.on_command = path, on_command
-        self._sock: socket.socket | None = None
+        self._sock: Listener | None = None
 
     def start(self) -> None:
-        try:
-            os.unlink(self.path)
-        except FileNotFoundError:
-            pass
-        self._sock = socket.socket(socket.AF_UNIX)
-        self._sock.bind(self.path)
-        self._sock.listen(8)
+        self._sock = Listener(self.path)
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self) -> None:
         assert self._sock is not None
         while True:
             try:
-                conn, _ = self._sock.accept()
+                conn = self._sock.accept()
             except OSError:
                 return
             with conn:
@@ -37,7 +31,9 @@ class CommandServer:
                     raw = conn.recv(4096)
                 except OSError:
                     continue
-                cmd = decode(raw)
+                msg = self._sock.unwrap(raw)
+                if msg is None: continue                 # not from this user's app
+                cmd = decode(msg)
                 if cmd is None: continue
                 if cmd.cmd is Cmd.HELLO:
                     try:
@@ -50,7 +46,3 @@ class CommandServer:
     def close(self) -> None:
         if self._sock:
             self._sock.close(); self._sock = None
-        try:
-            os.unlink(self.path)
-        except OSError:
-            pass

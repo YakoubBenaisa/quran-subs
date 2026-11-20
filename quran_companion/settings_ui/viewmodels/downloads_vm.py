@@ -1,9 +1,9 @@
 """Downloading surahs for offline use, with progress and cancel."""
-import os
-import subprocess
+
 
 from PySide6.QtCore import QObject, Signal
 
+from ... import system
 from ...core.i18n import T
 from ...core.models import Reciter
 from ...data.library import LibraryStats
@@ -77,5 +77,4 @@ class DownloadsViewModel(QObject):
         self.repo.library.delete(rec)
 
     def open_folder(self) -> None:
-        os.makedirs(self.folder, exist_ok=True)
-        subprocess.Popen(["xdg-open", self.folder])
+        system.open_folder(self.folder)

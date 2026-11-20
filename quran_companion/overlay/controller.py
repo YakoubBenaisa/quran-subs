@@ -13,6 +13,7 @@ from ..ipc.server import CommandServer
 from ..playback.clock import MonotonicClock
 from ..playback.player import AudioPlayer
 from ..playback.session import Session, View
+from .hotkeys import Hotkeys
 from .painter import make_paginator, register_fonts
 from .window import OverlayWindow
 
@@ -42,6 +43,7 @@ class OverlayController:
                                lambda s: make_paginator(s, self.window.screen_width() * s.max_width / 100),
                                listener=self, runner=self._run_async, corrector=corrector)
         self.server = CommandServer(socket_path, self.bridge.command.emit)
+        self.hotkeys = Hotkeys(self.bridge.command.emit)     # Windows / macOS; Linux uses desktop shortcuts
         self.timer = QTimer(); self.timer.timeout.connect(self.session.tick)
         store.update(visible=not start_hidden, ov_pid=os.getpid(), ov_version=PROTOCOL_VERSION)
 
@@ -56,6 +58,7 @@ class OverlayController:
 
     def start(self) -> None:
         self.server.start()
+        self.hotkeys.start()
         s = self.store.load()
         self.session.load(s.surah, s.ayah, rng=(s.range_from, s.range_to))
         self.timer.start(TICK_MS)
@@ -90,5 +93,6 @@ class OverlayController:
 
     def shutdown(self) -> None:
         self.session.stop()
+        self.hotkeys.stop()
         self.server.close()
         self.pool.shutdown(wait=False, cancel_futures=True)

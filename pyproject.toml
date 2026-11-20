@@ -10,7 +10,10 @@ requires-python = ">=3.11"
 dependencies = ["PySide6>=6.5"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt", "ruff", "mypy"]
+# recordings from links and files (numpy, yt-dlp, imageio-ffmpeg = an ffmpeg binary for every system),
+# following a browser video on Linux (jeepney), global shortcuts on macOS (pynput)
+media = ["numpy", "yt-dlp", "imageio-ffmpeg", "jeepney; sys_platform == 'linux'", "pynput; sys_platform == 'darwin'"]
+dev = ["pytest", "pytest-qt", "ruff", "mypy", "numpy", "jeepney; sys_platform == 'linux'"]
 
 [project.scripts]
 quran-companion = "quran_companion.__main__:main"
