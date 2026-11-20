@@ -23,7 +23,8 @@ class ReciteMode(Mode):
     def _set_times(self, times) -> None:
         self.times = list(times)
         self.starts = [t.start_ms for t in self.times]
-        self.tmap = {t.ayah: (t.start_ms, t.end_ms) for t in self.times}
+        self.tmap: dict[int, tuple[int, int]] = {}
+        for t in self.times: self.tmap.setdefault(t.ayah, (t.start_ms, t.end_ms))   # first time through
 
     def start(self, ayah: int) -> None:
         if not self.times:
@@ -79,21 +80,22 @@ class ReciteMode(Mode):
     # ---------------------------------------------------------------- corrections (own recordings)
     def _correct(self, d: int) -> None:
         cur = self.hold if self.hold is not None else (self.session.cur or 0)
-        order = [t.ayah for t in self.times]
-        if cur not in order: return
-        k = order.index(cur)
-        if d < 0:                                  # "not yet"
-            if k > 0:
-                self.hold = order[k - 1]; self.session.show(self.hold, 0)
-            return
-        if k + 1 >= len(order): return
-        nxt = order[k + 1]
         pos = self.session.player.position() or 0
         at = int(pos * 1000)
-        # move it here at once: shift this verse and the ones after it
-        delta = at - self.tmap[nxt][0]
-        shifted = [t if t.ayah in order[:k + 1] else type(t)(t.ayah, max(0, t.start_ms + delta), max(0, t.end_ms + delta))
-                   for t in self.times]
+        # which entry is on screen: the verse shown, nearest to now (a verse can come more than once)
+        same = [i for i, t in enumerate(self.times) if t.ayah == cur]
+        if not same: return
+        k = min(same, key=lambda i: abs(self.times[i].start_ms - at))
+        if d < 0:                                  # "not yet"
+            if k > 0:
+                self.hold = self.times[k - 1].ayah; self.session.show(self.hold, 0)
+            return
+        if k + 1 >= len(self.times): return
+        nxt = self.times[k + 1].ayah
+        # move it here at once: shift the next verse and the ones after it
+        delta = at - self.times[k + 1].start_ms
+        shifted = [t if i <= k else type(t)(t.ayah, max(0, t.start_ms + delta), max(0, t.end_ms + delta))
+                   for i, t in enumerate(self.times)]
         prev = shifted[k]; shifted[k] = type(prev)(prev.ayah, prev.start_ms, at)
         self._set_times(shifted)
         self.hold = None
