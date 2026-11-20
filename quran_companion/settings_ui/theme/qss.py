@@ -5,17 +5,21 @@ from ...core.i18n import rtl
 from .tokens import C, rgba
 
 
-def build_qss(i):
+def build_qss(i, ui_font: str = "", quran_font: str = ""):
+    """ui_font goes into the stylesheet because Qt otherwise falls back to the desktop font
+    (e.g. a monospace GNOME font) for every widget a stylesheet touches."""
     c = C
+    fam = f'font-family:"{ui_font}";' if ui_font else ""
+    qfam = f'font-family:"{quran_font}";' if quran_font else ""
     fill, rest = ("add", "sub") if rtl() else ("sub", "add")  # Qt does not mirror slider pages in RTL
     return f"""
-QWidget {{ color:{c['TEXT']}; }}
+QWidget {{ color:{c['TEXT']}; {fam} }}
 QStackedWidget, QScrollArea, QWidget#page, QWidget#modeopts {{ background:transparent; }}
 QScrollArea {{ border:none; }}
 QFrame#side {{ background:{c['SIDE']}; border:none; }}
 QFrame#bar {{ background:{c['SIDE']}; border-top:1px solid {c['BORDER']}; }}
 QLabel#brandAr {{ color:{c['ACCENT']}; font-size:15pt; font-weight:700; }}
-QLabel#quran {{ color:{c['ACCENT']}; }}
+QLabel#quran {{ color:{c['ACCENT']}; {qfam} }}
 QLabel#brand {{ font-size:12.5pt; font-weight:700; }}
 QLabel#muted {{ color:{c['MUTED']}; }}
 QLabel#small {{ color:{c['MUTED']}; font-size:9pt; }}
@@ -43,8 +47,15 @@ QLineEdit:hover, QComboBox:hover, QSpinBox:hover, QFontComboBox:hover {{ border-
 QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QFontComboBox:focus {{ border:1px solid {c['ACCENT']}; }}
 QComboBox::drop-down {{ border:none; width:28px; }}
 QComboBox::down-arrow {{ image:url({i['down']}); width:12px; height:12px; }}
-QComboBox QAbstractItemView {{ background:{c['CARD']}; border:1px solid {c['BORDER']}; selection-background-color:{c['ACCENT']};
-        selection-color:{c['ON']}; outline:0; padding:4px; border-radius:10px; }}
+QComboBox {{ combobox-popup:0; }}
+QComboBox:on {{ border:1px solid {c['ACCENT']}; background:{c['CARD2']}; }}
+QComboBox::down-arrow:on {{ image:url({i['up']}); }}
+QComboBoxPrivateContainer {{ background:transparent; border:none; padding:0; margin:0; }}
+QComboBox QAbstractItemView {{ background:{c['CARD']}; border:1px solid {rgba(c['ACCENT'], 0.35)}; border-radius:12px;
+        padding:6px; outline:0; selection-background-color:{rgba(c['ACCENT'], 0.16)}; selection-color:{c['TEXT']}; }}
+QComboBox QAbstractItemView::item {{ min-height:32px; padding:0 10px; border-radius:8px; margin:1px 0; color:{c['TEXT']}; }}
+QComboBox QAbstractItemView::item:hover {{ background:{c['HOVER']}; }}
+QComboBox QAbstractItemView::item:selected {{ background:{rgba(c['ACCENT'], 0.16)}; color:{c['ACCENT']}; font-weight:600; }}
 QSpinBox::up-button, QSpinBox::down-button {{ width:20px; border:none; background:transparent; }}
 QSpinBox::up-arrow {{ image:url({i['up']}); width:10px; height:10px; }}
 QSpinBox::down-arrow {{ image:url({i['down']}); width:10px; height:10px; }}

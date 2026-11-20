@@ -14,7 +14,12 @@ DOWNLOADED_ROLE = Qt.UserRole + 1
 
 class ReciterDelegate(QStyledItemDelegate):
     def sizeHint(self, opt, idx):
-        return QSize(200, ROW_HEIGHT)
+        # tall enough for the name line and the style line in the current UI font (Arabic fonts are taller)
+        base = opt.font.pointSizeF()
+        f = QFont(opt.font); f.setPointSizeF(base + (1.5 if rtl() else 0.5)); f.setWeight(QFont.DemiBold)
+        f2 = QFont(opt.font); f2.setPointSizeF(base - 1)
+        h = QFontMetricsF(f).height() + QFontMetricsF(f2).height() + 2 + 22
+        return QSize(200, max(ROW_HEIGHT, int(h + 0.99)))
 
     def paint(self, p, opt, idx):
         r: Reciter = idx.data(RECITER_ROLE); n = idx.data(DOWNLOADED_ROLE) or 0
