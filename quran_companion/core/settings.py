@@ -33,6 +33,8 @@ class Settings:
     volume: int = 100
     autonext: bool = True
     word_sync: bool = True
+    follow_player: str = ""    # follow a browser video (MPRIS name prefix) instead of playing the audio
+    follow_url: str = ""       # the video the recording was made from
     # memorize mode
     mem_advance: str = "words"
     mem_per_word: float = 0.8

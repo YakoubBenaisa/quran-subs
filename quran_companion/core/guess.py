@@ -89,3 +89,11 @@ def clean_title(title: str, limit: int = 70) -> str:
     parts = [p for p in parts if p]
     out = " · ".join(parts[:2]) if parts else (title or "").strip()
     return out if len(out) <= limit else out[:limit - 1].rstrip() + "…"
+
+
+def same_video(a: str, b: str) -> bool:
+    """Same YouTube video even if the links differ (&t=, &list=, youtu.be)."""
+    def vid(u: str) -> str:
+        m = re.search(r"(?:v=|youtu\.be/|shorts/|embed/|live/)([\w-]{6,})", u or "")
+        return m.group(1) if m else (u or "").split("#")[0].split("&")[0]
+    return bool(a and b) and vid(a) == vid(b)

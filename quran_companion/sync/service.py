@@ -82,17 +82,31 @@ class SyncService:
 
     # ------------------------------------------------------------ features (cached)
     def _target(self, m: MyRecitation, progress, cancel) -> engine.Target:
-        path = os.path.join(self.store.cache_dir, f"{m.id}.npz")
+        path = self.features_path(m)
         if os.path.exists(path):
-            with np.load(path) as z: return engine.Target(z["features"], z["envelope"])
+            with np.load(path) as z:
+                if "mean" in z: return engine.Target(z["features"], z["envelope"])
         progress(0.05)
         x = features.decode(m.audio, cancel=cancel)
         progress(0.5)
-        t = engine.Target(features.mfcc(x), envelope_from_samples(x))
+        raw = features.mfcc_raw(x)
+        mean, std = features.stats(raw)
+        t = engine.Target(features.normalize(raw, mean, std), envelope_from_samples(x))
         os.makedirs(self.store.cache_dir, exist_ok=True)
-        np.savez_compressed(path, features=t.features, envelope=t.envelope)
+        np.savez_compressed(path, features=t.features, envelope=t.envelope, mean=mean, std=std)
         progress(1.0)
         return t
+
+    def features_for_audio(self, audio: str) -> str:
+        """Features file of the recording whose audio is `audio` (computed if missing)."""
+        m = next((x for x in self.store.all() if x.audio == audio), None)
+        if m is None: raise FileNotFoundError(audio)
+        self._target(m, lambda f: None, lambda: False)
+        return self.features_path(m)
+
+    def features_path(self, m: MyRecitation) -> str:
+        """Features of the recording (also used to find the position of a browser video by listening)."""
+        return os.path.join(self.store.cache_dir, f"{m.id}.npz")
 
     def _named(self, m: MyRecitation) -> Reciter | None:
         if not m.reciter_name: return None

@@ -48,6 +48,22 @@ _WINDOW = np.hamming(_WIN).astype(np.float32)
 
 def mfcc(x: np.ndarray) -> np.ndarray:
     """[frames, N_MFCC-1] at FPS frames/s, mean/variance normalised (speaker differences shrink)."""
+    c = mfcc_raw(x)
+    mean, std = stats(c)
+    return normalize(c, mean, std)
+
+
+def stats(c: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if len(c) == 0: return np.zeros(N_MFCC - 1, np.float32), np.ones(N_MFCC - 1, np.float32)
+    return c.mean(0).astype(np.float32), (c.std(0) + 1e-6).astype(np.float32)
+
+
+def normalize(c: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
+    return ((c - mean) / std).astype(np.float32)
+
+
+def mfcc_raw(x: np.ndarray) -> np.ndarray:
+    """MFCC without normalisation; normalise with the stats of the whole recording."""
     x = x.astype(np.float32) / 32768
     n = (len(x) - _WIN) // _HOP + 1
     if n <= 0: return np.zeros((0, N_MFCC - 1), np.float32)
@@ -61,6 +77,4 @@ def mfcc(x: np.ndarray) -> np.ndarray:
     c = np.concatenate(out)[:, 1:]                    # drop c0 (loudness)
     k = 100 // FPS
     m = len(c) // k
-    c = c[:m * k].reshape(m, k, -1).mean(1)
-    c = (c - c.mean(0)) / (c.std(0) + 1e-6)
-    return c.astype(np.float32)
+    return c[:m * k].reshape(m, k, -1).mean(1).astype(np.float32)

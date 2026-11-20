@@ -167,3 +167,31 @@ def test_link_or_file_syncs_and_selects_the_recording(window_factory, qtbot, lan
     assert vals["reciter"] == r.reciter().id and vals["surah"] == 18
     w.go(2)
     assert not w.downloads.b_all.isEnabled()          # nothing to download: it's on disk
+
+
+def test_video_in_browser_sync_then_follow_values(window_factory, qtbot, monkeypatch):
+    from quran_companion.playback.mpris import Media
+    from quran_companion.settings_ui.views.browser_panel import BrowserMediaViewModel
+    monkeypatch.setattr(BrowserMediaViewModel, "refresh", lambda self: None)      # never touch the real browsers
+    w, vms = window_factory("en", "light")
+    r = w.recite
+    r.srcg.button(2).click()
+    b = r.browser
+    assert r.sources.currentWidget() is b
+    vid = Media("org.mpris.MediaPlayer2.firefox.instance_1_9", "Firefox", "سورة الكهف | Mishary Alafasy",
+                "https://www.youtube.com/watch?v=abc123&t=5", "Playing", 0.0)
+    b._fill([vid])
+    assert b.selected == vid and b.b_sync.isEnabled() and not b.b_follow.isEnabled()
+    assert w.all_values()["follow_player"] == ""                 # nothing synced yet: not following
+    b.b_sync.click()                                              # FakeSync recognises Al-Kahf and saves it
+    qtbot.waitUntil(lambda: b.b_follow.isEnabled(), timeout=5000)
+    vals = w.all_values()
+    assert vals["follow_player"] == "org.mpris.MediaPlayer2.firefox" and "abc123" in vals["follow_url"]
+    assert repo_mine_id(vals) and vals["mode"] == "recite" and vals["surah"] == 18
+    r.srcg.button(0).click()
+    assert w.all_values()["follow_player"] == ""                  # back on the reciter list: plays the audio itself
+
+
+def repo_mine_id(vals):
+    from quran_companion.core.models import MINE_BASE
+    return vals["reciter"] >= MINE_BASE

@@ -50,6 +50,19 @@ def make_corrector(repo):
     return correct
 
 
+def make_player(repo, st):
+    """ffplay for audio, or following a browser video for the user's own recordings."""
+    from .playback.browser_player import BrowserPlayer
+    from .playback.player import FfplayPlayer, RoutingPlayer
+    service = None
+
+    def features_for(audio: str) -> str:
+        nonlocal service
+        if service is None: service = make_sync_service(repo)
+        return service.features_for_audio(audio)
+    return RoutingPlayer(FfplayPlayer(), BrowserPlayer(), st.load, features_for)
+
+
 def run_overlay(args) -> int:
     import argparse
     ap = argparse.ArgumentParser(prog="quran-companion overlay")
@@ -70,12 +83,10 @@ def run_overlay(args) -> int:
 
     from .data.repository import default_repository
     from .overlay.controller import OverlayController
-    from .playback.player import FfplayPlayer
-
     app = QApplication(sys.argv[:1])
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     repo = default_repository()
-    ctl = OverlayController(repo, st, FfplayPlayer(), paths.socket_path(), start_hidden=a.hidden,
+    ctl = OverlayController(repo, st, make_player(repo, st), paths.socket_path(), start_hidden=a.hidden,
                             corrector=make_corrector(repo))
     app.aboutToQuit.connect(ctl.shutdown)
     ctl.start()

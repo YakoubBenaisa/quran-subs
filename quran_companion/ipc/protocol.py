@@ -8,7 +8,7 @@ import enum
 import json
 from dataclasses import dataclass, field
 
-PROTOCOL_VERSION = 5
+PROTOCOL_VERSION = 6
 
 
 class Cmd(str, enum.Enum):
