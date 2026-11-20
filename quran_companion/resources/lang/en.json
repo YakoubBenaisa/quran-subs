@@ -192,5 +192,8 @@
  "browser_needs_sync": "Not synced yet. Syncing takes about a minute for a long surah.",
  "sync_video": "Sync this video",
  "follow_video": "Follow this video",
- "no_video_link": "This player does not share the video's link, so it can't be synced."
+ "no_video_link": "This player does not share the video's link, so it can't be synced.",
+ "sync_as": "Sync as {surah}",
+ "pick_surah_sync": "The title does not say which surah this is. Choose it in the Surah list, then press Sync as …",
+ "poor_check_surah": "Few verses matched. Check that the surah is right; if not, choose it and sync again."
 }

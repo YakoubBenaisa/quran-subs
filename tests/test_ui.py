@@ -19,6 +19,8 @@ class FakeSync:
         from quran_companion.data.media import MediaInfo
         from quran_companion.sync.service import Inspection
         if "bad" in src: raise ValueError("not a link or an existing file")
+        if "nosurah" in src:
+            return Inspection(MediaInfo(src, "video", "Beautiful recitation", 1500.0, "k"), None, None, False)
         return Inspection(MediaInfo(src, "video", "سورة الكهف | Mishary Alafasy", 1500.0, "k"), 18,
                           self.repo.find_reciter(ALAFASY), False)
 
@@ -190,6 +192,26 @@ def test_video_in_browser_sync_then_follow_values(window_factory, qtbot, monkeyp
     assert repo_mine_id(vals) and vals["mode"] == "recite" and vals["surah"] == 18
     r.srcg.button(0).click()
     assert w.all_values()["follow_player"] == ""                  # back on the reciter list: plays the audio itself
+
+
+def test_video_in_browser_without_surah_in_title_asks_for_it(window_factory, qtbot, monkeypatch):
+    from quran_companion.playback.mpris import Media
+    from quran_companion.settings_ui.views.browser_panel import BrowserMediaViewModel
+    monkeypatch.setattr(BrowserMediaViewModel, "refresh", lambda self: None)
+    w, vms = window_factory("en", "light")
+    r = w.recite
+    r.srcg.button(2).click()
+    b = r.browser
+    b._fill([Media("org.mpris.MediaPlayer2.firefox.instance_1_9", "Firefox", "Beautiful recitation",
+                   "https://www.youtube.com/watch?v=nosurah123", "Playing", 0.0)])
+    b.b_sync.click()
+    qtbot.waitUntil(lambda: b.b_sync.text().startswith("Sync as"), timeout=5000)
+    assert not vms["mine"].recordings()                            # nothing synced on a guess
+    r.set_surah(11)
+    assert "Hud" in b.b_sync.text()
+    b.b_sync.click()
+    qtbot.waitUntil(lambda: b.b_follow.isEnabled(), timeout=5000)
+    assert vms["mine"].recordings()[0].surah == 11
 
 
 def repo_mine_id(vals):

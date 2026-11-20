@@ -12,6 +12,10 @@ TITLES = [
     ("سورة الملك بصوت عبد الباسط عبد الصمد", 67, "Abdulsamad"),
     ("Surah Ar-Rahman (The Beneficent)", 55, None),
     ("سورة ق | ماهر المعيقلي", 50, None),
+    ("Surah Al-Hud By Sheikh Yasser Al-Dosari | 1425 AH", 11, "Dosari"),
+    ("Surat An-Nas", 114, None),
+    ("Surah Al Imran - Mishary Alafasy", 3, "Alafasi"),
+    ("Surah Al-Yusuf", 12, None),
     ("Relaxing nature sounds", None, None),
 ]
 
