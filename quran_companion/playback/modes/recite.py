@@ -1,4 +1,10 @@
-"""Recite: plays the reciter; the text follows the audio clock (verse timings + word timings)."""
+"""Recite: plays the reciter; the text follows the audio clock (verse timings + word timings).
+
+The user's own recordings (synced automatically) can be corrected while listening:
+next (→) = "the next verse starts now": that verse moves here at once, the rest follows, and
+the recording is re-matched in the background with this as a fixed point.
+previous (←) = "not yet": the text goes back one verse and waits for the next → (or for the
+recitation to get clearly past it)."""
 import bisect
 
 from ...core.i18n import T
@@ -10,8 +16,12 @@ END_TOLERANCE_MS = 1000   # ended this close to the last verse = finished normal
 class ReciteMode(Mode):
     def __init__(self, session):
         super().__init__(session)
-        d = session.data
-        self.times = d.timings
+        self._set_times(session.data.timings)
+        self.correctable = bool(session.rec and session.rec.mine and session.corrector)
+        self.hold: int | None = None          # verse kept on screen after "not yet"
+
+    def _set_times(self, times) -> None:
+        self.times = list(times)
         self.starts = [t.start_ms for t in self.times]
         self.tmap = {t.ayah: (t.start_ms, t.end_ms) for t in self.times}
 
@@ -35,6 +45,11 @@ class ReciteMode(Mode):
         ms = pos * 1000
         i = max(0, bisect.bisect_right(self.starts, ms) - 1)
         t = self.times[i]
+        if self.hold is not None:
+            if self.hold in self.tmap and t.ayah <= self.hold + 1:
+                if self.session.cur != self.hold: self.session.show(self.hold, 0)
+                return
+            self.hold = None                   # the recitation is clearly past it
         end = self.session.range_end()
         if end and t.ayah > end:
             if self.session.s.loop: self.play_from(self.tmap.get(self.session.rng[0], (0, 0))[0] / 1000)
@@ -56,8 +71,40 @@ class ReciteMode(Mode):
             self.session.message(T("ov_stopped"))
 
     def step(self, d: int) -> None:
+        if self.correctable and d != 0 and self.session.player.active() and not self.session.player.paused:
+            self._correct(d); return
         t = self.tmap.get((self.session.cur or 0) + d)
         if t: self.play_from(t[0] / 1000)
+
+    # ---------------------------------------------------------------- corrections (own recordings)
+    def _correct(self, d: int) -> None:
+        cur = self.hold if self.hold is not None else (self.session.cur or 0)
+        order = [t.ayah for t in self.times]
+        if cur not in order: return
+        k = order.index(cur)
+        if d < 0:                                  # "not yet"
+            if k > 0:
+                self.hold = order[k - 1]; self.session.show(self.hold, 0)
+            return
+        if k + 1 >= len(order): return
+        nxt = order[k + 1]
+        pos = self.session.player.position() or 0
+        at = int(pos * 1000)
+        # move it here at once: shift this verse and the ones after it
+        delta = at - self.tmap[nxt][0]
+        shifted = [t if t.ayah in order[:k + 1] else type(t)(t.ayah, max(0, t.start_ms + delta), max(0, t.end_ms + delta))
+                   for t in self.times]
+        prev = shifted[k]; shifted[k] = type(prev)(prev.ayah, prev.start_ms, at)
+        self._set_times(shifted)
+        self.hold = None
+        self.session.show(nxt, 0)
+        rid, session = self.session.rec.id if self.session.rec else 0, self.session
+        corrector = session.corrector
+        assert corrector is not None
+
+        def done(res) -> None:
+            if session.mode is self and isinstance(res, list) and res: self._set_times(res)
+        session.runner(lambda: corrector(rid, nxt, pos), done)
 
     def pause(self) -> bool:
         p = self.session.player

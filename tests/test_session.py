@@ -168,3 +168,57 @@ def test_restyle_repaginates_current_verse(repo, store):
     assert len(ses.pages_for(282)) == 3
     store.update(max_lines=6); ses.restyle()
     assert len(ses.pages_for(282)) == 2 and rec.views[-1].ayah == 282
+
+
+# ---------------------------------------------------------------- the user's own recordings
+def _my_recording(repo, tmp_path):
+    from quran_companion.core.models import MyRecitation, VerseTiming
+    from quran_companion.data.my_recitations import MyRecitations
+    repo.mine = MyRecitations(str(tmp_path / "mine"))
+    ts = [VerseTiming(0, 0, 5000)] + [VerseTiming(a, 5000 + (a - 1) * 10000, 5000 + a * 10000) for a in range(1, 111)]
+    return repo.mine.save(MyRecitation(1, "Al-Kahf", "https://youtu.be/x", str(tmp_path / "a.m4a"), 18, list(range(111)), ts,
+                                       confident=0.9))
+
+
+def test_my_recording_plays_its_file_and_stays_on_its_surah(repo, store, tmp_path):
+    m = _my_recording(repo, tmp_path)
+    assert repo.reciters()[0].mine and repo.find_reciter(m.reciter_id).ar == "Al-Kahf"
+    ses, player, _, rec = make(repo, store, mode="recite")
+    store.update(reciter=m.reciter_id)
+    ses.load(18, 1)
+    assert player.calls[-1][1] == m.audio
+    player.pos = 25.5; ses.tick()
+    assert ses.cur == 3
+    player.pos = 1104.9; player.ended = True; ses.tick()      # end of recording: no next surah
+    assert ses.state is State.FINISHED
+    ses.load(2, 1)                                             # another surah is not in the recording
+    assert ses.state is State.ERROR
+
+
+def test_correcting_my_recording(repo, store, tmp_path):
+    from quran_companion.core.models import VerseTiming
+    m = _my_recording(repo, tmp_path)
+    calls = []
+
+    def corrector(rid, ayah, at):
+        calls.append((rid, ayah, round(at, 1)))
+        d = int(at * 1000) - next(t.start_ms for t in m.timings if t.ayah == ayah)    # "re-matched" around the anchor
+        return [VerseTiming(t.ayah, t.start_ms + (d if t.ayah >= ayah else 0), t.end_ms + (d if t.ayah >= ayah - 1 else 0))
+                for t in m.timings]
+    from quran_companion.overlay.painter import make_paginator
+    store.update(reciter=m.reciter_id, mode="recite")
+    rec, player, clock = Recorder(), FakePlayer(), FakeClock()
+    ses = Session(repo, player, clock, store, lambda s: make_paginator(s, SCREEN * s.max_width / 100), rec, corrector=corrector)
+    ses.load(18, 1)
+    player.pos = 27.0; ses.tick()
+    assert ses.cur == 3
+    # the text is late: verse 4 really starts now (27 s instead of 35 s)
+    ses.step(1)
+    assert ses.cur == 4 and calls == [(m.reciter_id, 4, 27.0)]
+    player.pos = 28.0; ses.tick()
+    assert ses.cur == 4            # the timings after the result came back are the corrector's
+    # "not yet": back to 3 and wait, even though the clock says 4
+    player.pos = 36.0; ses.tick(); assert ses.cur == 4
+    ses.step(-1); assert ses.cur == 3
+    player.pos = 36.5; ses.tick(); assert ses.cur == 3          # verse 4 is 27–37 s now
+    player.pos = 40.0; ses.tick(); assert ses.cur == 5          # clearly past it: follows the clock again

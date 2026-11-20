@@ -5,7 +5,7 @@ import os
 import pytest
 
 PKG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "quran_companion")
-QT_FREE = ["core", "data", "layout", "playback", "ipc"]
+QT_FREE = ["core", "data", "layout", "playback", "ipc", "sync"]
 FORBIDDEN = ("PySide6", "quran_companion.overlay", "quran_companion.settings_ui")
 
 

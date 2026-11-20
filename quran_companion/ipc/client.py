@@ -69,6 +69,7 @@ class OverlayClient:
     def restart(self, hidden: bool = False) -> None:
         """Quit whatever overlay runs (any version) and start the current one; it resumes at the saved verse."""
         self.send_raw("quit")
+        
         for _ in range(40):
             if not self.running(): break
             time.sleep(0.05)

@@ -45,7 +45,11 @@ class ReciterDelegate(QStyledItemDelegate):
             else: main.setRight(b.left() - 10)
         title = r.name(R)
         other = (r.en or "") if R else r.ar
-        style = r.short_style + (("  ·  " + T("n_surahs", n=r.count)) if r.count < 114 else "")
+        if r.mine:
+            other = ""
+            style = T("my_recording") + (f"  ·  {r.style}" if r.style else "")
+        else:
+            style = r.short_style + (("  ·  " + T("n_surahs", n=r.count)) if r.count < 114 else "")
         A = (Qt.AlignRight if R else Qt.AlignLeft) | Qt.AlignAbsolute
         B = (Qt.AlignLeft if R else Qt.AlignRight) | Qt.AlignAbsolute
         fo = QFont(opt.font); fo.setPointSizeF(opt.font.pointSizeF() + (0 if R else 1.5))
