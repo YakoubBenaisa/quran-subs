@@ -81,3 +81,23 @@ def test_overlay_controller_handles_commands(repo, store, tmp_path, qtbot):
         c.send(Cmd.BIGGER); qtbot.waitUntil(lambda: store.load().size == 44, timeout=3000)
     finally:
         ctl.shutdown()
+
+
+def test_wheel_over_dropdown_scrolls_page_not_value(qapp):
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtWidgets import QApplication, QComboBox, QSpinBox
+
+    from quran_companion.settings_ui.widgets import input_guard
+    g = input_guard.install(qapp)
+    try:
+        cb = QComboBox(); cb.addItems([str(i) for i in range(20)]); cb.setCurrentIndex(5)
+        sp = QSpinBox(); sp.setValue(5)
+        for w in (cb, sp):
+            w.ensurePolished()
+            ev = QWheelEvent(QPointF(5, 5), QPointF(5, 5), QPoint(), QPoint(0, -120), Qt.NoButton, Qt.NoModifier, Qt.NoScrollPhase, False)
+            QApplication.sendEvent(w, ev)
+            assert not ev.isAccepted()      # handed on to the page
+        assert cb.currentIndex() == 5 and sp.value() == 5
+    finally:
+        qapp.removeEventFilter(g)

@@ -92,10 +92,12 @@ def run_ui() -> int:
     from .settings_ui.theme.manager import apply_app_theme
     from .settings_ui.viewmodels import AppViewModel, CatalogViewModel, DownloadsViewModel, PlaybackViewModel
     from .settings_ui.views.main_window import MainWindow
+    from .settings_ui.widgets import input_guard
 
     app = QApplication(sys.argv[:1]); app.setApplicationName("Quran Companion"); app.setDesktopFileName("quran-subs")
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     register_fonts()
+    input_guard.install(app)
     st, repo, bg = store(), default_repository(), Background()
     vms = dict(app=AppViewModel(st), catalog=CatalogViewModel(repo, bg),
                playback=PlaybackViewModel(st, OverlayClient()), downloads=DownloadsViewModel(repo, bg))

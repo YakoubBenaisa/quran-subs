@@ -4,6 +4,7 @@ from PySide6.QtGui import QFont
 
 from ...core.i18n import rtl, tr
 from ...core.settings import UI_FONT, Settings
+from ...overlay.painter import register_fonts
 from .icons import _ICON_CACHE, make_icons
 from .qss import build_qss, make_palette
 from .tokens import THEMES, C, theme_name
@@ -16,4 +17,4 @@ def apply_app_theme(app, s: Settings) -> None:
     _ICON_CACHE.clear()
     app.setLayoutDirection(Qt.RightToLeft if rtl() else Qt.LeftToRight)
     f = QFont(s.ui_font or UI_FONT); f.setPointSizeF(10); app.setFont(f)
-    app.setStyle("Fusion"); app.setPalette(make_palette()); app.setStyleSheet(build_qss(make_icons()))
+    app.setStyle("Fusion"); app.setPalette(make_palette()); app.setStyleSheet(build_qss(make_icons(), f.family(), register_fonts()))

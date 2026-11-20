@@ -56,6 +56,7 @@ class AppearancePage(QWidget):
     def _quran_card(self):
         c, cv = card(T("arabic_text"))
         self.font = QFontComboBox(); self.font.setWritingSystem(QFontDatabase.WritingSystem.Arabic)
+        self.font.setProperty("sample", "بِسْمِ ٱللَّهِ")
         self.font.setCurrentFont(QFont(self.s.font or register_fonts()))
         self.size, l = slider(16, 120, self.s.size, lambda x: f"{x} pt")
         cv.addWidget(field(T("font"), self.font)); cv.addWidget(field(T("size"), self.size, l))
@@ -63,7 +64,7 @@ class AppearancePage(QWidget):
 
     def _translation_card(self):
         c, cv = card(T("translation_text"))
-        self.trfont = QFontComboBox(); self.trfont.setCurrentFont(QFont(self.s.tr_font))
+        self.trfont = QFontComboBox(); self.trfont.setCurrentFont(QFont(self.s.tr_font)); self.trfont.setProperty("sample", "Aa Bb")
         self.trscale, l = slider(20, 120, self.s.tr_scale, lambda x: T("pct_of_arabic", p=x))
         cv.addWidget(field(T("font"), self.trfont)); cv.addWidget(field(T("size"), self.trscale, l))
         return c
