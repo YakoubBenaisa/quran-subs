@@ -2,8 +2,9 @@
 
 For every reference reciter: match the recording to the reference's audio (DTW over MFCC
 features) and carry the reference's known verse starts across. The middle value over the
-references is used, then nudged onto a nearby pause. Corrections from the user ("verse k starts
-at t") are anchors: the recording and the references are cut there and matched piece by piece.
+references is used (where they disagree, the proposal whose verses fit best), then nudged
+onto a nearby pause. Corrections from the user ("verse k starts at t") are anchors: the
+recording and the references are cut there and matched piece by piece.
 """
 from dataclasses import dataclass, field
 
@@ -76,6 +77,50 @@ def _snap(t: float, pauses: list[Pause], lo: float, hi: float) -> float:
 LOW_CONFIDENCE = 0.5
 
 
+def _verse_fit(target: np.ndarray, t0: float, t1: float, ref: np.ndarray, r0: float, r1: float) -> float:
+    """How well the recording between t0 and t1 matches the reference between r0 and r1."""
+    A = target[int(t0 * FPS):max(int(t0 * FPS) + 2, int(t1 * FPS))]
+    B = ref[int(r0 * FPS):max(int(r0 * FPS) + 2, int(r1 * FPS))]
+    if len(A) < 2 or len(B) < 2: return 10.0
+    ratio = len(A) / len(B)
+    if not 0.33 < ratio < 3: return 10.0                       # far too long or too short for this verse
+    return dtw.path_cost(A, B, dtw.align(A, B))
+
+
+def _settle_disputes(out: dict[int, float], per_ref: list[dict[int, float]], spans: list[dict[int, float]],
+                     refs: list[Reference], target: np.ndarray, ayahs: list[int], anchors: dict[int, float],
+                     end: float) -> None:
+    """Where the references disagree, the middle value can be far from all of them. Each
+    reference's proposal for the disputed run of verses is scored by how well its verses match
+    the same verses in every reference, and the best one is used."""
+    keys = [a for a in ayahs if a in out]
+    disputed = [a not in anchors and len({round(g.get(a, -1), 1) for g in per_ref}) > 1 and
+                max(g.get(a, 0) for g in per_ref) - min(g.get(a, 1e9) for g in per_ref) > AGREE for a in keys]
+    i = 0
+    while i < len(keys):
+        if not disputed[i]: i += 1; continue
+        j = i
+        while j + 1 < len(keys) and disputed[j + 1]: j += 1
+        run = keys[i:j + 1]
+        nxt = keys[j + 1] if j + 1 < len(keys) else -1        # the agreed verse after the run (-1 = the end)
+        t_next = out[nxt] if nxt != -1 else end
+        best, best_score = None, float("inf")
+        for prop in per_ref:
+            if not all(a in prop for a in run): continue
+            times = [prop[a] for a in run] + [t_next]
+            if any(b <= a for a, b in zip(times, times[1:], strict=False)): continue
+            score = 0.0
+            for ref, sp in zip(refs, spans, strict=True):
+                for k, a in enumerate(run):
+                    b = run[k + 1] if k + 1 < len(run) else nxt
+                    if a not in sp or b not in sp: continue
+                    score += _verse_fit(target, times[k], times[k + 1], ref.features, sp[a], sp[b]) * (sp[b] - sp[a])
+            if score < best_score: best, best_score = prop, score
+        if best is not None:
+            for a in run: out[a] = best[a]
+        i = j + 1
+
+
 def sync(target: Target, refs: list[Reference], ayahs: list[int], anchors: dict[int, float] | None = None,
          progress=lambda f: None, cancel=lambda: False) -> SyncResult:
     """ayahs: the verses the recording contains, in order (0 = intro first, if it has one).
@@ -110,6 +155,7 @@ def _sync(target: Target, refs: list[Reference], ayahs: list[int], anchors: dict
     anchors = {a: t for a, t in (anchors or {}).items() if a in ayahs}
     dur = len(target.features) / FPS
     per_ref: list[dict[int, float]] = []
+    spans: list[dict[int, float]] = []
     starts_found, ends_found, costs, idx = [], [], [], []
     for ri, ref in enumerate(refs):
         if cancel(): raise InterruptedError("cancelled")
@@ -133,13 +179,14 @@ def _sync(target: Target, refs: list[Reference], ayahs: list[int], anchors: dict
             if np.isfinite(c): cost_sum += c * (rb - ra); cost_n += rb - ra
             if k == 0: starts_found.append(s if ta is None else ta)
             if k == len(cuts) - 2: ends_found.append(e if tb is None else tb)
-        per_ref.append(got); costs.append(cost_sum / cost_n if cost_n else float("inf")); idx.append(ri)
+        per_ref.append(got); spans.append(span); costs.append(cost_sum / cost_n if cost_n else float("inf")); idx.append(ri)
         progress((ri + 1) / len(refs))
     if not per_ref: raise ValueError("no reference recitation has timings for these verses")
     best = int(np.argmin(costs))
     if costs[best] < SAME_RECORDING:
         # the reference is this very recording (e.g. a video of a published recitation): use it alone
         per_ref, starts_found, ends_found = [per_ref[best]], [starts_found[best]], [ends_found[best]]
+        spans = [spans[best]]
     start = float(np.median(starts_found)); end = float(np.median(ends_found))
     pauses = find_pauses(target.envelope)
     out: dict[int, float] = {}
@@ -150,6 +197,9 @@ def _sync(target: Target, refs: list[Reference], ayahs: list[int], anchors: dict
         if not vals: continue
         if max(vals) - min(vals) <= AGREE: agree += 1
         out[a] = float(np.median(vals))
+    if len(per_ref) > 2:
+        _settle_disputes(out, per_ref, spans, refs if len(spans) == len(refs) else [refs[idx[best]]],
+                         target.features, ayahs, anchors, end)
     keys = [a for a in ayahs if a in out]
     # nudge onto pauses (not anchors), keep the order strictly increasing
     times: list[float] = []

@@ -21,8 +21,18 @@ def _ar_key(name: str) -> str:
     return w[2:] if w.startswith("ال") and len(w) > 3 else w
 
 
+_ARTICLES = {"al", "el", "an", "ar", "as", "at", "ad", "ash", "az", "adh", "ath", "aal"}
+
+
 def _en_words(t: str) -> list[str]:
-    return [_skeleton(w) for w in re.split(r"[^a-zA-Z]+", t) if w]
+    """Word skeletons without a separate article: "Al-Hud" and "Hud", "An-Nas" and "Nas" match."""
+    return [_skeleton(w) for w in re.split(r"[^a-zA-Z]+", t) if w and w.lower() not in _ARTICLES]
+
+
+def _spelled(t: str) -> str:
+    """Letters with vowels kept, no articles, doubled letters once: "An-Naas" -> "nas"."""
+    words = [w for w in re.split(r"[^a-z]+", t.lower()) if w and w not in _ARTICLES]
+    return re.sub(r"(.)\1+", r"\1", "".join(words))
 
 
 def guess_surah(title: str, surahs: list[SurahInfo]) -> int | None:
@@ -46,6 +56,7 @@ def guess_surah(title: str, surahs: list[SurahInfo]) -> int | None:
         seg = low[start:start + 40] if start else low
         words = _en_words(seg)
         joined = "".join(words)
+        spelled = _spelled(seg)
         best = None
         for s in surahs:
             names = [s.english] + list(_EN_VARIANTS.get(s.number, ()))
@@ -53,7 +64,8 @@ def guess_surah(title: str, surahs: list[SurahInfo]) -> int | None:
                 k = "".join(_en_words(nm))
                 if len(k) < 3 and not start: continue
                 ok = (joined.startswith(k) if start else (k in words or (len(k) >= 5 and k in joined)))
-                if ok and (best is None or len(k) > best[0]): best = (len(k), s.number)
+                score = (len(k), spelled.startswith(_spelled(nm)) if start else _spelled(nm) in spelled)
+                if ok and (best is None or score > best[0]): best = (score, s.number)
         if best: return best[1]
     # 4. a number: "surah 18", "018 ...", "18-"
     num = re.search(r"(?:surah|surat|sura|سورة)\s*(\d{1,3})\b", low) or re.match(r"\s*0*(\d{1,3})(?:\D|$)", low)

@@ -11,13 +11,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ...core.i18n import T
+from ...core.guess import same_video
+from ...core.i18n import T, rtl
 from ...playback.mpris import Media
 from ..background import Background
 from ..theme.icons import icon
 from ..theme.tokens import C
 from ..viewmodels import CatalogViewModel, MineViewModel
 from ..widgets.basic import lbl
+
+WRONG_SURAH = 0.2      # so few verses agree that the surah is probably not the one chosen
 
 
 class BrowserMediaViewModel(QObject):
@@ -52,6 +55,7 @@ class BrowserPanel(QWidget):
         self.mine, self.catalog, self.vm, self.current_surah = mine, catalog, media_vm, current_surah
         self.selected: Media | None = None
         self._pending_sync = False
+        self._asked = None                  # checked video whose surah the title did not give
         v = QVBoxLayout(self); v.setContentsMargins(0, 4, 0, 0); v.setSpacing(10)
         v.addWidget(lbl(T("browser_sub"), "muted", True))
         self.list = QListWidget(); self.list.setObjectName("lib"); self.list.setMinimumHeight(150)
@@ -118,6 +122,14 @@ class BrowserPanel(QWidget):
 
     def _chosen(self, it, *_) -> None:
         self.selected = it.data(Qt.UserRole) if it else None
+        if not self._waiting_for_surah(): self._asked = None
+        self._update()
+
+    def _waiting_for_surah(self) -> bool:
+        m = self.selected
+        return bool(self._asked and m and m.url and same_video(self._asked.info.source, m.url))
+
+    def surah_changed(self) -> None:
         self._update()
 
     def _update(self) -> None:
@@ -126,7 +138,11 @@ class BrowserPanel(QWidget):
         busy = self.mine.busy
         self.b_sync.setEnabled(bool(m and m.url) and not busy)
         self.b_follow.setEnabled(rec is not None and not busy)
-        self.b_sync.setText(T("sync_again") if rec else T("sync_video"))
+        if self._waiting_for_surah():
+            x = self.catalog.surah(self.current_surah())
+            self.b_sync.setText(T("sync_as", surah=(x.short_name if rtl() else x.english) if x else self.current_surah()))
+        else:
+            self.b_sync.setText(T("sync_again") if rec else T("sync_video"))
         self.prog.setVisible(busy and self._pending_sync)
         if not m: self.state.hide(); return
         if not m.url: text = T("no_video_link")
@@ -137,15 +153,23 @@ class BrowserPanel(QWidget):
     # ------------------------------------------------------------ sync & follow
     def _sync(self) -> None:
         if not (self.selected and self.selected.url): return
+        if self._waiting_for_surah():                    # the user chose the surah: go
+            ins, self._asked = self._asked, None
+            self._pending_sync = True
+            self.mine.sync(ins, self.current_surah(), 1, 0); self._update()
+            return
         self._pending_sync = True
         self.status.setText(T("checking"))
         self.mine.inspect(self.selected.url, "browser")
 
     def _on_inspected(self, tag: str, ins) -> None:
         if tag != "browser" or not self._pending_sync: return
-        surah = ins.surah or self.current_surah()
-        if ins.surah: self.surah_guessed.emit(ins.surah)
-        self.mine.sync(ins, surah, 1, 0)
+        if not ins.surah:                                # never guess: a wrong surah cannot be synced
+            self._pending_sync, self._asked = False, ins
+            self.status.setText(T("pick_surah_sync")); self._update()
+            return
+        self.surah_guessed.emit(ins.surah)
+        self.mine.sync(ins, ins.surah, 1, 0)
         self._update()
 
     def _on_inspect_failed(self, tag: str, err: str) -> None:
@@ -159,7 +183,9 @@ class BrowserPanel(QWidget):
     def _on_synced(self, m) -> None:
         if not self._pending_sync: return
         self._pending_sync = False
-        self.status.setText(T("synced", n=len([t for t in m.timings if t.ayah]), q=self.mine.quality_text(m)))
+        text = T("synced", n=len([t for t in m.timings if t.ayah]), q=self.mine.quality_text(m))
+        if m.confident < WRONG_SURAH: text += "<br>" + T("poor_check_surah")
+        self.status.setText(text)
         self._update()
 
     def _on_sync_failed(self, err: str) -> None:

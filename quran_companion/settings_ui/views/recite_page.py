@@ -274,6 +274,7 @@ class RecitePage(QWidget):
             self.ayah.setMaximum(n); self.ayah.setValue(1); self.ayah_to.setMaximum(n); self.ayah_to.setValue(0)
         self._show_surah_info()
         if self.link: self.link.surah_changed()
+        if self.browser: self.browser.surah_changed()
         self.surah_changed.emit(self.surah_number())
 
     def _show_surah_info(self) -> None:
