@@ -1,0 +1,10 @@
+# Everything a release build bundles (pip install -r packaging/requirements-build.txt)
+PySide6-Essentials>=6.8
+PySide6-Addons>=6.8          # QtMultimedia lives here
+numpy
+yt-dlp
+imageio-ffmpeg               # an ffmpeg binary for Windows / macOS / Linux, used to read audio for syncing
+jeepney; sys_platform == "linux"
+pynput; sys_platform == "darwin"
+pyinstaller>=6.10
+pillow                       # lets PyInstaller turn logo.png into .ico / .icns

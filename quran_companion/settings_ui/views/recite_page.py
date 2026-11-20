@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ... import system
 from ...core.i18n import T
 from ...core.models import Reciter
 from ...core.settings import ADVANCE, HINTS, MODES, Settings
@@ -150,7 +151,8 @@ class RecitePage(QWidget):
         self.reccount = lbl(T("loading"), "small"); row.addWidget(self.reccount); cv.addLayout(row)
         self.srcg = None
         if self.mine is not None:
-            sw, self.srcg = segmented([T("src_reciters"), T("src_link"), T("src_browser")])
+            tabs = [T("src_reciters"), T("src_link")] + ([T("src_browser")] if system.BROWSER_FOLLOW else [])
+            sw, self.srcg = segmented(tabs)                 # following a browser video needs Linux (MPRIS)
             self.srcg.idClicked.connect(self._source_changed)
             cv.addWidget(sw)
         self.sources = FitStack(); self.sources.setObjectName("modeopts")

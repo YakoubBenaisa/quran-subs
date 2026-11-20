@@ -3,6 +3,8 @@ import subprocess
 
 import numpy as np
 
+from .. import system
+
 RATE = 8000
 FPS = 10                       # feature frames per second used for matching
 _WIN = 256                     # 32 ms window at 8 kHz
@@ -10,10 +12,12 @@ _HOP = RATE // 100             # 10 ms analysis hop, averaged down to FPS
 N_MELS, N_MFCC = 26, 13
 
 
-def decode(src: str, ffmpeg: str = "ffmpeg", cancel=lambda: False) -> np.ndarray:
+def decode(src: str, ffmpeg: str | None = None, cancel=lambda: False) -> np.ndarray:
     """Mono 8 kHz int16 samples of a file or URL."""
+    ffmpeg = ffmpeg or system.tool("ffmpeg")
+    if not ffmpeg: raise RuntimeError("ffmpeg is needed to read audio (pip install imageio-ffmpeg)")
     p = subprocess.Popen([ffmpeg, "-v", "error", "-nostdin", "-i", src, "-vn", "-ac", "1", "-ar", str(RATE), "-f", "s16le", "-"],
-                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, **system.no_window())
     assert p.stdout is not None
     chunks = []
     while True:

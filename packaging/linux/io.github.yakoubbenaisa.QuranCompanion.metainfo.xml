@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: the app's page on Flathub and in GNOME Software / KDE Discover. -->
+<component type="desktop-application">
+  <id>io.github.yakoubbenaisa.QuranCompanion</id>
+  <name>Quran Companion</name>
+  <name xml:lang="ar">رفيق التلاوة</name>
+  <summary>Quran verses on your screen while you work</summary>
+  <summary xml:lang="ar">آيات القرآن على شاشتك أثناء عملك</summary>
+  <developer id="io.github.yakoubbenaisa">
+    <name>Yakoub Benaisa</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <!-- TODO before publishing: the license you choose for the code, e.g. GPL-3.0-or-later or MIT -->
+  <project_license>LicenseRef-TODO</project_license>
+  <description>
+    <p>
+      A reciter plays and the verse being recited appears over your windows like subtitles, with its
+      translation. The text never takes focus and clicks pass through it, so you keep working underneath.
+    </p>
+    <ul>
+      <li>115 reciters with verse timings, page turns on the exact word for many of them</li>
+      <li>Memorize mode: silent, at your pace, with hints that reveal or hide the verse</li>
+      <li>Recitations from YouTube, MP3 links or your own files, synced to the verses automatically</li>
+      <li>Follow a recitation video playing in Firefox or Chrome</li>
+      <li>Translations in many languages, Arabic and English interface, light and dark themes</li>
+      <li>Global keyboard shortcuts and offline downloads</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.yakoubbenaisa.QuranCompanion.desktop</launchable>
+  <url type="homepage">https://yakoubbenaisa.github.io/quran-subs/</url>
+  <url type="bugtracker">https://github.com/YakoubBenaisa/quran-subs/issues</url>
+  <url type="vcs-browser">https://github.com/YakoubBenaisa/quran-subs</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Verses and their translation over your windows</caption>
+      <image>https://raw.githubusercontent.com/YakoubBenaisa/quran-subs/main/docs/screenshots/overlay.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Choose a surah, a mode and a reciter</caption>
+      <image>https://raw.githubusercontent.com/YakoubBenaisa/quran-subs/main/docs/screenshots/recite.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Recitations from links and files, synced automatically</caption>
+      <image>https://raw.githubusercontent.com/YakoubBenaisa/quran-subs/main/docs/screenshots/link.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Arabic interface</caption>
+      <image>https://raw.githubusercontent.com/YakoubBenaisa/quran-subs/main/docs/screenshots/recite-ar.png</image>
+    </screenshot>
+  </screenshots>
+  <categories>
+    <category>Education</category>
+  </categories>
+  <keywords>
+    <keyword>Quran</keyword>
+    <keyword>Koran</keyword>
+    <keyword>recitation</keyword>
+    <keyword>memorize</keyword>
+    <keyword xml:lang="ar">قرآن</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <releases>
+    <release version="5.0.0" date="2026-11-20">
+      <description>
+        <p>First release for Windows, macOS and Linux.</p>
+      </description>
+    </release>
+  </releases>
+</component>

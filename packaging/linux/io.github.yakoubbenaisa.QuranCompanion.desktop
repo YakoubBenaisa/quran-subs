@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Quran Companion
+Name[ar]=رفيق التلاوة
+GenericName=Quran reader and reciter
+GenericName[ar]=قارئ القرآن الكريم
+Comment=Read, listen and memorize the Quran while you work
+Comment[ar]=تلاوة وحفظ القرآن الكريم أثناء عملك
+Exec=quran-companion ui
+Icon=io.github.yakoubbenaisa.QuranCompanion
+Terminal=false
+Categories=Education;Audio;AudioVideo;
+Keywords=Quran;Koran;Islam;recitation;memorize;hifz;subtitles;قرآن;تلاوة;حفظ;
+StartupWMClass=quran-subs
