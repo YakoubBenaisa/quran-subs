@@ -9,8 +9,8 @@ from typing import Callable
 
 import numpy as np
 
-from ..core.guess import clean_title, guess_reciter, guess_surah
-from ..core.models import MyRecitation, Reciter
+from ..core.guess import clean_title, guess_reciter, guess_surah, same_video
+from ..core.models import MyRecitation, Reciter, VerseTiming
 from ..data.media import MediaFetcher, MediaInfo
 from ..data.my_recitations import MyRecitations
 from ..data.repository import QuranRepository
@@ -56,7 +56,10 @@ class SyncService:
         n = next(s.ayahs for s in self.repo.surahs() if s.number == surah)
         a, b = max(1, ayah_from), (ayah_to if ayah_to and ayah_to >= ayah_from else n)
         ayahs = ([0] if a == 1 else []) + list(range(a, min(b, n) + 1))
-        m = MyRecitation(self.store.new_id(), clean_title(title or ins.info.title), ins.info.source, audio, surah, ayahs,
+        old = self.existing(ins.info.source)          # syncing the same video / file again replaces it
+        rid = old.id if old else self.store.new_id()
+        if old: self._drop_features(old)
+        m = MyRecitation(rid, clean_title(title or ins.info.title), ins.info.source, audio, surah, ayahs,
                          reciter_name=(ins.reciter.name(False) if ins.reciter else ""))
         target = self._target(m, _stage(progress, "analyse"), cancel)
         refs = self._references(surah, ins.reciter, _stage(progress, "references"), cancel)
@@ -64,9 +67,26 @@ class SyncService:
         m.timings, m.confident = res.timings, res.confident
         return self.store.save(m)
 
+    def existing(self, source: str) -> MyRecitation | None:
+        return next((x for x in self.store.all() if same_video(x.source, source) or x.source == source), None)
+
+    def _drop_features(self, m: MyRecitation) -> None:
+        p = self.features_path(m)
+        if os.path.exists(p): os.unlink(p)
+
     # ------------------------------------------------------------ corrections
     def correct(self, m: MyRecitation, ayah: int, at: float, cancel: Callable[[], bool] = lambda: False) -> MyRecitation:
-        """The user says `ayah` starts at `at` seconds: keep it as an anchor and re-match."""
+        """The user says `ayah` starts at `at` seconds: keep it as an anchor and re-match.
+        In a later time through the surah (the video repeats it), that pass is shifted instead."""
+        seen = [i for i, t in enumerate(m.timings) if t.ayah == ayah]
+        if len(seen) > 1:
+            k = min(seen, key=lambda i: abs(m.timings[i].start_ms / 1000 - at))
+            if k != seen[0]:
+                d = int(at * 1000) - m.timings[k].start_ms
+                end = next((j for j in seen if j > k), len(m.timings))
+                end = next((j for j in range(k + 1, len(m.timings)) if m.timings[j].ayah < m.timings[j - 1].ayah), end)
+                m.timings = [VerseTiming(t.ayah, t.start_ms + d, t.end_ms + d) if k <= j < end else t for j, t in enumerate(m.timings)]
+                return self.store.save(m)
         anchors = {**m.anchors, ayah: float(at)}
         return self.resync(replace(m, anchors=anchors), cancel)
 

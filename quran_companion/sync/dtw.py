@@ -111,3 +111,10 @@ def map_times(path: np.ndarray, times_b: list[float], fps: int = 10) -> list[flo
     j, i = path[:, 1].astype(float), path[:, 0].astype(float)
     order = np.argsort(j, kind="stable")
     return list(np.interp(np.asarray(times_b) * fps, j[order], i[order]) / fps)
+
+
+def path_cost(A: np.ndarray, B: np.ndarray, path: np.ndarray) -> float:
+    """Average distance between matched frames: low = the two recordings really match."""
+    if len(path) == 0: return float("inf")
+    d = A[path[:, 0]] - B[path[:, 1]]
+    return float(np.sqrt((d ** 2).sum(1)).mean())

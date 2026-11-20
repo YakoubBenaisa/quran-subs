@@ -85,3 +85,20 @@ def test_pauses_found_in_envelope():
     env = np.array([60.0] * 40 + [10.0] * 10 + [60.0] * 40, np.float32)
     ps = find_pauses(env)
     assert len(ps) == 1 and abs(ps[0].t - 40 * HOP) < 0.2
+
+
+def test_same_recording_twice_is_used_alone_and_both_passes_are_found():
+    rng = np.random.default_rng(4)
+    pats = _verse_patterns(20, rng)
+    own, st = _render(pats, 1.0, rng)                       # the published recording itself
+    other, st2 = _render(pats, 1.3, rng)                    # another reciter
+    refs = [engine.Reference(other, _timings(st2, len(other) / FPS)), engine.Reference(own, _timings(st, len(own) / FPS))]
+    video = np.concatenate([own, own])                      # the video plays it twice
+    res = engine.sync(engine.Target(video, _quiet_envelope(video)), refs, list(range(1, 21)))
+    assert len(res.passes) == 2 and len(res.timings) == 40
+    first = np.array([t.start_ms / 1000 for t in res.timings[:20]])
+    second = np.array([t.start_ms / 1000 for t in res.timings[20:]])
+    expect = np.array(st) - np.array([0.0] + [0.5] * 19)    # verse starts sit at the pause before
+    assert np.median(np.abs(first - expect)) < 0.2
+    assert np.median(np.abs(second - (expect + len(own) / FPS))) < 0.3
+    assert res.confident == 1.0
