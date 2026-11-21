@@ -32,6 +32,7 @@ class MediaInfo:
     key: str = ""          # stable id for the downloaded file
 
 
+
 def kind_of(src: str) -> str:
     s = src.strip()
     if os.path.exists(os.path.expanduser(s)): return "file"
@@ -55,14 +56,14 @@ def _probe_title(path: str) -> tuple[str, float]:
         probe = system.tool("ffprobe")
         if probe:
             out = subprocess.run([probe, "-v", "error", "-show_format", "-of", "json", path],
-                                 capture_output=True, text=True, timeout=20, **system.no_window()).stdout
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20, **system.no_window()).stdout
             fmt = json.loads(out).get("format", {})
             tags = {k.lower(): v for k, v in fmt.get("tags", {}).items()}
             dur = float(fmt.get("duration") or 0)
         else:
             ff = system.tool("ffmpeg")
             if not ff: return "", 0.0
-            err = subprocess.run([ff, "-hide_banner", "-i", path], capture_output=True, text=True, timeout=20,
+            err = subprocess.run([ff, "-hide_banner", "-i", path], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20,
                                  **system.no_window()).stderr
             tags = {m.group(1).lower(): m.group(2).strip() for m in re.finditer(r"^\s{4}(\w+)\s*:\s(.*)$", err, re.M)}
             d = re.search(r"Duration:\s*(\d+):(\d+):([\d.]+)", err)
@@ -86,8 +87,8 @@ class MediaFetcher:
         if k == "url":
             name = urllib.parse.unquote(os.path.basename(urllib.parse.urlparse(src).path))
             return MediaInfo(src, k, os.path.splitext(name)[0], 0.0, hashlib.sha1(src.encode()).hexdigest()[:12])
-        out = subprocess.run(_ytdlp() + ["-J", "--no-playlist", "--no-warnings", src], capture_output=True, text=True, timeout=90,
-                             **system.no_window())
+        out = subprocess.run(_ytdlp() + ["-J", "--no-playlist", "--no-warnings", src], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=90, **system.no_window())
         if out.returncode != 0:
             raise RuntimeError((out.stderr.strip().splitlines() or ["could not open the link"])[-1].replace("ERROR: ", ""))
         d = json.loads(out.stdout)
@@ -115,7 +116,8 @@ class MediaFetcher:
             return dst
         cmd = _ytdlp() + ["-f", "bestaudio/best", "--no-playlist", "--no-warnings", "--newline", "--progress",
                           "-o", os.path.join(self.dir, info.key + ".%(ext)s"), "--print", "after_move:filepath", info.source]
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, **system.no_window())
+        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                             encoding="utf-8", errors="replace", **system.no_window())
         last = ""; path = ""
         assert p.stdout is not None
         for line in p.stdout:

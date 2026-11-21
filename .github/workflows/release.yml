@@ -21,6 +21,7 @@ jobs:
           - os: ubuntu-22.04        # older glibc: the AppImage runs on more distributions
     runs-on: ${{ matrix.os }}
     env:
+      PYTHONUTF8: "1"        # read sources as UTF-8 on Windows too
       SIGN_MAC: ${{ secrets.MACOS_CERT_P12 != '' }}
     steps:
       - uses: actions/checkout@v4

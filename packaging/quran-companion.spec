@@ -7,7 +7,7 @@ import sys
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = os.path.abspath(os.path.join(SPECPATH, ".."))  # noqa: F821 - SPECPATH is set by PyInstaller
-VERSION = re.search(r'__version__ = "([^"]+)"', open(os.path.join(ROOT, "quran_companion", "__init__.py")).read()).group(1)
+VERSION = re.search(r'__version__ = "([^"]+)"', open(os.path.join(ROOT, "quran_companion", "__init__.py"), encoding="utf-8").read()).group(1)
 APP_ID = "io.github.yakoubbenaisa.QuranCompanion"
 WIN, MAC = sys.platform == "win32", sys.platform == "darwin"
 

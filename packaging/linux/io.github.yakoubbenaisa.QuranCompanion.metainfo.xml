@@ -67,7 +67,7 @@
     <display_length compare="ge">768</display_length>
   </requires>
   <releases>
-    <release version="5.0.1" date="2026-11-21">
+    <release version="5.0.2" date="2026-11-21">
       <description>
         <p>First release for Windows, macOS and Linux.</p>
       </description>

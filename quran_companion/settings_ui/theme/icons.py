@@ -54,7 +54,7 @@ def _icon_dir():
 
 def _write(name, svg):
     p = os.path.join(_icon_dir(), name + ".svg")
-    with open(p, "w") as f: f.write(svg)
+    with open(p, "w", encoding="utf-8") as f: f.write(svg)
     return p
 
 
