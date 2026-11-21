@@ -57,8 +57,9 @@ def test_paths_per_system(monkeypatch, tmp_path, plat, expect):
         assert P.socket_path().endswith(sock)
         assert P.mine_dir() != P.library_dir() and P.cache_dir()
         if plat == "linux":
-            assert P.config_file() == os.path.expanduser("~/.config/quran-overlay.json")     # unchanged for Linux users
-            assert P.mine_dir() == os.path.expanduser("~/.local/share/quran-overlay/mine")
+            linux_cfg = os.path.expanduser("~/.config/quran-overlay.json")                      # unchanged for Linux users
+            assert os.path.normpath(P.config_file()) == os.path.normpath(linux_cfg)
+            assert os.path.normpath(P.mine_dir()) == os.path.normpath(os.path.expanduser("~/.local/share/quran-overlay/mine"))
     finally:
         monkeypatch.undo()
         importlib.reload(S); importlib.reload(P)

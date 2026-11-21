@@ -55,7 +55,10 @@ def golden():
 @pytest.fixture(scope="session")
 def qapp_fonts():
     from PySide6.QtWidgets import QApplication
+
+    from quran_companion import qt_gc
     app = QApplication.instance() or QApplication([])
+    if not app.findChild(qt_gc.MainThreadGC): qt_gc.install(app)     # as the app does: no GC on worker threads
     from quran_companion.overlay.painter import register_fonts
     register_fonts()
     return app

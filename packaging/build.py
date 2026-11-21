@@ -21,7 +21,7 @@ import zipfile
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PKG = os.path.join(ROOT, "packaging")
 DIST = os.path.join(ROOT, "dist")
-VERSION = re.search(r'__version__ = "([^"]+)"', open(os.path.join(ROOT, "quran_companion", "__init__.py")).read()).group(1)
+VERSION = re.search(r'__version__ = "([^"]+)"', open(os.path.join(ROOT, "quran_companion", "__init__.py"), encoding="utf-8").read()).group(1)
 APP_ID = "io.github.yakoubbenaisa.QuranCompanion"
 NAME = f"QuranCompanion-{VERSION}"
 
@@ -109,7 +109,7 @@ def linux() -> list[str]:
         shutil.copy(os.path.join(PKG, "linux", f"{APP_ID}.metainfo.xml"), os.path.join(appdir, "usr", "share", "metainfo"))
         shutil.copy(os.path.join(PKG, "linux", f"{APP_ID}.desktop"), appdir)
         shutil.copy(os.path.join(ROOT, "quran_companion", "resources", "icons", "logo.png"), os.path.join(appdir, f"{APP_ID}.png"))
-        with open(os.path.join(appdir, "AppRun"), "w") as f:
+        with open(os.path.join(appdir, "AppRun"), "w", encoding="utf-8") as f:
             f.write('#!/bin/sh\nHERE="$(dirname "$(readlink -f "$0")")"\nexec "$HERE/usr/lib/quran-companion/QuranCompanion" "$@"\n')
         os.chmod(os.path.join(appdir, "AppRun"), 0o755)
         img = os.path.join(DIST, f"{NAME}-linux-{arch}.AppImage")

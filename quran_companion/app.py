@@ -88,9 +88,11 @@ def run_overlay(args) -> int:
         os.environ.setdefault("QT_QPA_PLATFORM", "xcb")   # XWayland: always-on-top + click-through on GNOME
     from PySide6.QtWidgets import QApplication
 
+    from . import qt_gc
     from .data.repository import default_repository
     from .overlay.controller import OverlayController
     app = QApplication(sys.argv[:1])
+    qt_gc.install(app)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     repo = default_repository()
     ctl = OverlayController(repo, st, make_player(repo, st), paths.socket_path(), start_hidden=a.hidden,
@@ -146,6 +148,8 @@ def run_ui() -> int:
     from .settings_ui.widgets import input_guard
 
     app = QApplication(sys.argv[:1]); app.setApplicationName("Quran Companion"); app.setDesktopFileName("quran-subs")
+    from . import qt_gc
+    qt_gc.install(app)
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     register_fonts()
     input_guard.install(app)
