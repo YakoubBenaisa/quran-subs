@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quran-companion"
-version = "5.0.0"
+version = "5.0.1"
 description = "Quran verses on screen while you work: recite, memorize, follow along."
 requires-python = ">=3.11"
 dependencies = ["PySide6>=6.5"]
