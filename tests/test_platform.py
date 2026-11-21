@@ -68,6 +68,7 @@ def test_shortcut_label_follows_the_system(monkeypatch):
     from quran_companion.core import i18n
     t = i18n.Translator()
     t.set("en")
+    monkeypatch.setattr(i18n, "MOD_LABEL", "Super+Alt")
     assert "Super+Alt" in t.t("fix_hint")
     monkeypatch.setattr(i18n, "MOD_LABEL", "Win+Alt")
     assert "Win+Alt+→" in t.t("fix_hint") and "Super" not in t.t("fix_hint")

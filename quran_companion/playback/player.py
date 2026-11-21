@@ -4,6 +4,7 @@ import io
 import re
 import signal
 import subprocess
+import sys
 import threading
 from typing import Callable, Protocol
 
@@ -63,12 +64,12 @@ class FfplayPlayer:
     def stop(self) -> None:
         self._gen += 1
         if self._proc and self._proc.poll() is None:
-            if self._paused: self._proc.send_signal(signal.SIGCONT)
+            if self._paused and sys.platform != "win32": self._proc.send_signal(signal.SIGCONT)
             self._proc.terminate()
         self._proc, self._paused, self._ended = None, False, False
 
     def set_paused(self, paused: bool) -> None:
-        if self._proc and self._proc.poll() is None and paused != self._paused:
+        if sys.platform != "win32" and self._proc and self._proc.poll() is None and paused != self._paused:
             self._proc.send_signal(signal.SIGSTOP if paused else signal.SIGCONT)
             self._paused = paused
 

@@ -2,6 +2,7 @@
 import pytest
 from conftest import ALAFASY
 
+from quran_companion import system
 from quran_companion.core.settings import STYLE_KEYS
 from quran_companion.ipc.client import OverlayClient
 from quran_companion.ipc.protocol import Cmd, Command
@@ -85,9 +86,9 @@ def test_window_rebuild_keeps_choices(window_factory, store):
     assert s.mode == "memorize" and s.size == 55
 
 
-def test_overlay_controller_handles_commands(repo, store, tmp_path, qtbot):
+def test_overlay_controller_handles_commands(repo, store, sock_dir, qtbot):
     from quran_companion.overlay.controller import OverlayController
-    sock = str(tmp_path / "ov.sock")
+    sock = str(sock_dir / "ov.sock")
     store.update(surah=112, ayah=1, mode="manual", range_from=1, range_to=0)
     ctl = OverlayController(repo, store, FakePlayer(), sock)
     ctl.start()
@@ -171,6 +172,7 @@ def test_link_or_file_syncs_and_selects_the_recording(window_factory, qtbot, lan
     assert not w.downloads.b_all.isEnabled()          # nothing to download: it's on disk
 
 
+@pytest.mark.skipif(not system.BROWSER_FOLLOW, reason="following a browser video is Linux only")
 def test_video_in_browser_sync_then_follow_values(window_factory, qtbot, monkeypatch):
     from quran_companion.playback.mpris import Media
     from quran_companion.settings_ui.views.browser_panel import BrowserMediaViewModel
@@ -194,6 +196,7 @@ def test_video_in_browser_sync_then_follow_values(window_factory, qtbot, monkeyp
     assert w.all_values()["follow_player"] == ""                  # back on the reciter list: plays the audio itself
 
 
+@pytest.mark.skipif(not system.BROWSER_FOLLOW, reason="following a browser video is Linux only")
 def test_video_in_browser_without_surah_in_title_asks_for_it(window_factory, qtbot, monkeypatch):
     from quran_companion.playback.mpris import Media
     from quran_companion.settings_ui.views.browser_panel import BrowserMediaViewModel

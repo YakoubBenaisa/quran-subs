@@ -1,3 +1,5 @@
+import os
+
 import pytest
 from conftest import ALAFASY, FakeMeasurer
 
@@ -50,6 +52,8 @@ def test_pause_mark_stays_with_its_word():
 
 
 @pytest.mark.usefixtures("qapp_fonts")
+@pytest.mark.skipif(os.environ.get("CI") == "true",
+                    reason="the recorded pages depend on the fonts of the machine that recorded them")
 def test_real_fonts_match_old_app(repo, golden):
     from quran_companion.overlay.painter import make_paginator
     rec = repo.find_reciter(ALAFASY)

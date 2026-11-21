@@ -9,7 +9,8 @@ import socket
 
 from ..system import WINDOWS
 
-UNIX = hasattr(socket, "AF_UNIX") and not WINDOWS
+_AF_UNIX: int = getattr(socket, "AF_UNIX", -1)     # missing on some Windows builds and in mypy's Windows view
+UNIX = _AF_UNIX != -1 and not WINDOWS
 
 
 class Listener:
@@ -18,7 +19,7 @@ class Listener:
         self.key = b""
         _remove(path)
         if UNIX:
-            self.sock = socket.socket(socket.AF_UNIX)
+            self.sock = socket.socket(_AF_UNIX)
             self.sock.bind(path)
         else:
             self.sock = socket.socket(socket.AF_INET)
@@ -48,7 +49,7 @@ class Listener:
 def connect(path: str, timeout: float) -> tuple[socket.socket, bytes]:
     """(connected socket, prefix to send before the message)."""
     if UNIX:
-        s = socket.socket(socket.AF_UNIX)
+        s = socket.socket(_AF_UNIX)
         s.settimeout(timeout)
         try:
             s.connect(path)

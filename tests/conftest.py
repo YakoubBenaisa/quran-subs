@@ -81,3 +81,14 @@ class Recorder:
             k = (v.kind, v.ayah, v.index) if v.kind == "page" else (v.kind, v.ayah) if v.kind in ("hint", "blank") else ("message", v.text)
             if not out or out[-1] != k: out.append(k)
         return out
+
+
+@pytest.fixture
+def sock_dir():
+    """A short folder for sockets: macOS limits Unix socket paths to 104 bytes, and tmp_path is longer."""
+    import pathlib
+    import shutil
+    import tempfile
+    d = tempfile.mkdtemp(prefix="qc", dir=None if sys.platform == "win32" else "/tmp")
+    yield pathlib.Path(d)
+    shutil.rmtree(d, ignore_errors=True)

@@ -2,6 +2,9 @@ import socket
 import threading
 import time
 
+import pytest
+
+from quran_companion.ipc import transport
 from quran_companion.ipc.client import OverlayClient
 from quran_companion.ipc.protocol import PROTOCOL_VERSION, Cmd, Command, decode, parse_cli
 from quran_companion.ipc.server import CommandServer
@@ -26,8 +29,8 @@ def test_legacy_text_commands():
     assert parse_cli(["goto"]) is None   # needs arguments: use "surah N"
 
 
-def test_server_and_client(tmp_path):
-    path = str(tmp_path / "s.sock")
+def test_server_and_client(sock_dir):
+    path = str(sock_dir / "s.sock")
     got = []
     srv = CommandServer(path, got.append); srv.start()
     c = OverlayClient(path)
@@ -45,9 +48,10 @@ def test_server_and_client(tmp_path):
     assert not c.running() and c.hello() is None
 
 
-def test_old_overlay_that_never_answers_is_outdated(tmp_path):
-    path = str(tmp_path / "old.sock")
-    s = socket.socket(socket.AF_UNIX); s.bind(path); s.listen(4)
+@pytest.mark.skipif(not transport.UNIX, reason="Unix sockets only; Windows uses a local TCP port")
+def test_old_overlay_that_never_answers_is_outdated(sock_dir):
+    path = str(sock_dir / "old.sock")
+    s = socket.socket(transport._AF_UNIX); s.bind(path); s.listen(4)
 
     def old_overlay():   # v4 behaviour: reads the command, closes, never replies
         try:
